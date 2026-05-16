@@ -1,0 +1,3210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPm Tracker ♡</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDNO4CjyWo5HY5oKy-t8yuHcm9lIGyQVCk",
+    authDomain:        "rpmtracker-42e64.firebaseapp.com",
+    projectId:         "rpmtracker-42e64",
+    storageBucket:     "rpmtracker-42e64.firebasestorage.app",
+    messagingSenderId: "112649412989",
+    appId:             "1:112649412989:web:9e5503225a4f973e77ec14",
+    measurementId:     "G-K1EYJRYERM"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  // ── Subjects & default state ────────────────────────────────────────────
+  const SUBJECTS = [
+    { id: "abpsych",  label: "ABPSYCH",  total: 0, emoji: "🧠" },
+    { id: "devpsy",   label: "DEVPSY",   total: 0, emoji: "🌱" },
+    { id: "psycas",   label: "PSYCAS",   total: 0, emoji: "📋" },
+    { id: "iopsych",  label: "I/O PSYCH",total: 0, emoji: "💼" },
+  ];
+
+  // ── TOS Data Structure ─────────────────────────────────────────────────────
+  const TOS_DATA = {
+    abpsych: {
+      name: "ABNORMAL PSYCHOLOGY",
+      emoji: "🧠",
+      sections: [
+        {
+          title: "A. MANIFESTATIONS OF BEHAVIOR 5% - 5 ITEMS",
+          topics: [
+            { id: "abpsych_a1_1", text: "(1) RECOGNIZING NORMAL AND ABNORMAL MANIFESTATIONS OF BEHAVIOR", done: false },
+            { id: "abpsych_a1_2", text: "(2) ASSESS ABNORMAL MANIFESTATIONS OF BEHAVIORS BASED ON THE SOCIAL CONTEXTS", done: false }
+          ]
+        },
+        {
+          title: "B. PSYCHOLOGICAL DISORDERS AND SPECIFIC SYMPTOMS BASED ON DSM-5 50% - 50 ITEMS",
+          topics: [
+            { id: "abpsych_b1_1", text: "(1) ANXIETY DISORDERS", done: false },
+            { id: "abpsych_b1_2", text: "(2) TRAUMA-AND-STRESSOR RELATED DISORDERS", done: false },
+            { id: "abpsych_b1_3", text: "(3) OBSESSIVE-COMPULSIVE DISORDERS", done: false },
+            { id: "abpsych_b1_4", text: "(4) SOMATIC SYMPTOMS", done: false },
+            { id: "abpsych_b1_5", text: "(5) DISSOCIATIVE DISORDERS", done: false },
+            { id: "abpsych_b1_6", text: "(6) DEPRESSIVE DISORDERS", done: false },
+            { id: "abpsych_b1_7", text: "(7) EATING AND SLEEPING DISORDERS", done: false },
+            { id: "abpsych_b1_8", text: "(8) SEXUAL DYSFUNCTIONS, PARAPHILIC DISORDERS, AND GENDER DYSPHORIA", done: false },
+            { id: "abpsych_b1_9", text: "(9) SUBSTANCE-RELATED AND ADDICTIVE DISORDER", done: false },
+            { id: "abpsych_b1_10", text: "(10) DISRUPTIVE, IMPULSE CONTROL DISORDERS, AND CONDUCT DISORDER", done: false },
+            { id: "abpsych_b1_11", text: "(11) PERSONALITY DISORDERS", done: false },
+            { id: "abpsych_b1_12", text: "(12) SCHIZOPHRENIA", done: false },
+            { id: "abpsych_b1_13", text: "(13) NEURODEVELOPMENTAL DISORDERS", done: false },
+            { id: "abpsych_b1_14", text: "(14) NEUROCOGNITIVE DISORDERS", done: false }
+          ]
+        },
+        {
+          title: "C. THEORETICAL APPROACHES IN EXPLAINING THE ETIOLOGY OF PSYCHOLOGICAL DISORDERS 20% - 20 ITEMS",
+          topics: [
+            { id: "abpsych_c1_1", text: "(1) GENETIC CONTRIBUTIONS", done: false },
+            { id: "abpsych_c1_2", text: "(2) BIOLOGICAL AND NEUROLOGICAL BASES", done: false },
+            { id: "abpsych_c1_3", text: "(3) LEARNING", done: false },
+            { id: "abpsych_c1_4", text: "(4) COGNITIVE THEORIES WITH PSYCHOANALYTIC", done: false },
+            { id: "abpsych_c1_5", text: "(5) DIATHESIS-STRESS MODEL", done: false },
+            { id: "abpsych_c1_6", text: "(6) GENE-ENVIRONMENT INTERACTION", done: false },
+            { id: "abpsych_c1_7", text: "(7) ROLE OF CULTURE, SOCIAL INTERACTIONS, AND INTERPERSONAL FACTORS IN DEVELOPMENT", done: false },
+            { id: "abpsych_c1_8", text: "(8) SUICIDE", done: false }
+          ]
+        },
+        {
+          title: "D. THERAPEUTIC INTERVENTIONS OF PSYCHOLOGICAL DISORDERS 10% - 10 ITEMS",
+          topics: [
+            { id: "abpsych_d1_1", text: "(1) DIFFERENT PSYCHOLOGICAL INTERVENTIONS", done: false },
+            { id: "abpsych_d1_2", text: "(2) APPLICATION OF PSYCHOLOGICAL INTERVENTIONS FOR TREATMENT", done: false },
+            { id: "abpsych_d1_3", text: "(3) EFFICACY OF PSYCHOLGICAL INTERVENTIONS", done: false }
+          ]
+        },
+        {
+          title: "E. SOCIO-CULTURAL FACTORS AND ETHICAL PRINCIPLES IN DIAGNOSING CASES OF ABNORMAL BEHAVIORS 5% - 5 ITEMS",
+          topics: [
+            { id: "abpsych_e1_1", text: "(1) IDENTIFY SOCIO-CULTURAL FACTORS THAT MAY IMPACT DIAGNOSING", done: false },
+            { id: "abpsych_e2_1", text: "(1) ETHICAL PRINCIPLES AND STANDARDS", done: false }
+          ]
+        },
+        {
+          title: "F. GLOBAL HEALTH CRISIS AND MENTAL HEALTH LAW 10% - 10 ITEMS",
+          topics: [
+            { id: "abpsych_f1_1", text: "(1) DIFFERENT ISSUES AND CONCERNS ON THE IMPACT OF COVID-19 ON THE MENTAL HEALTH OF PEOPLE", done: false },
+            { id: "abpsych_f1_2", text: "(2) IMPACT OF GLOBAL HEALTH CRISIS AND OTHER MENTAL HEALTH CONDITIONS ON THE IMPLEMENTATION OF RA11036", done: false }
+          ]
+        }
+      ]
+    },
+    iopsych: {
+      name: "INDUSTRIAL ORGANIZATIONAL PSYCHOLOGY",
+      emoji: "💼",
+      sections: [
+        {
+          title: "A. ORGANIZATIONAL THEORY 20% - 20 ITEMS",
+          topics: [
+            { id: "iopsych_a1", text: "(1) DIFFERENT ORGANIZATIONAL THEORIES, MODELS, AND CONCEPTS", done: false },
+            { id: "iopsych_a2_1", text: "(2.1) CLASSICAL ORGANIZATION THEORY", done: false },
+            { id: "iopsych_a2_2", text: "(2.2) NEIO-CLASSICAL ORGANIZATIONAL THEORY", done: false },
+            { id: "iopsych_a2_3", text: "(2.3) MODERN ORGANIZATIONAL THEORY", done: false },
+            { id: "iopsych_a2_4", text: "(2.4) CONTINGENCY THEORY", done: false },
+            { id: "iopsych_a2_5", text: "(2.5) MOTIVATION THEORY", done: false },
+            { id: "iopsych_a2_6", text: "(2.6) OPEN SYSTEMS THEORY", done: false },
+            { id: "iopsych_a3_1", text: "(3.1) ORGANIZATIONAL STURCTURE AND DESIGN", done: false },
+            { id: "iopsych_a3_2", text: "(3.2) LEADERSHIP", done: false },
+            { id: "iopsych_a3_3", text: "(3.3) MANAGERIAL STYLE", done: false },
+            { id: "iopsych_a3_4", text: "(3.4) GROUP BEHAVIOR", done: false },
+            { id: "iopsych_a3_5", text: "(3.5) MOTIVATION", done: false },
+            { id: "iopsych_a3_6", text: "(3.6) COMMUNICATION", done: false },
+            { id: "iopsych_a3_7", text: "(3.7) OPERATIONAL EFFICIENCY", done: false },
+            { id: "iopsych_a3_8", text: "(3.8) ORGANIZATIONAL CULTURE", done: false }
+          ]
+        },
+        {
+          title: "B. ORGANIZATIONAL STRUCTURES AND SYSTEMS 20% - 20 ITEMS",
+          topics: [
+            { id: "iopsych_b1", text: "(1) EVALUATE THE VALUE AND IMPORTANCE OF KNOWING & UNDERSTANDING THE VARIOUS ORG. MODELS & SYSTEMS", done: false },
+            { id: "iopsych_b2_1", text: "(2.1) FUNCTIONAL", done: false },
+            { id: "iopsych_b2_2", text: "(2.2) MULTI-DIVISIONAL", done: false },
+            { id: "iopsych_b2_3", text: "(2.3) FLAT", done: false },
+            { id: "iopsych_b2_4", text: "(2.4) MATRIX", done: false },
+            { id: "iopsych_b2_5", text: "(2.5) TEAM", done: false },
+            { id: "iopsych_b2_6", text: "(2.6) NETWORK", done: false },
+            { id: "iopsych_b2_7", text: "(2.7) HIERARCHICAL STRUCTURES", done: false },
+            { id: "iopsych_b3_1", text: "(3.1) JOB DESIGN", done: false },
+            { id: "iopsych_b3_2", text: "(3.2) DEPARTMENTATION", done: false },
+            { id: "iopsych_b3_3", text: "(3.3) DELEGATION", done: false },
+            { id: "iopsych_b3_4", text: "(3.4) SPAN OF CONTROL", done: false },
+            { id: "iopsych_b3_5", text: "(3.5) CHAIN OF COMMAND", done: false },
+            { id: "iopsych_b4", text: "(4) APPLY UNDERSTANDING OF ORG. DESIGN TO APPRECIATE ORG. ROLES AND PERFORMANCE ACCOUNTABILITY", done: false },
+            { id: "iopsych_b5", text: "(5) EXPLAIN THE IMPORTANCE OF ALIGNING THE ORG. STRUCTURE WITH THE BUSINESS STRATEGY", done: false },
+            { id: "iopsych_b6", text: "(6) APPLY UNDERSTANDING OF THE 4 BUSINESS ELEMENTS THAT MUST BE ALIGNED TO ENSURE PROFITABLE PERFORMANCE AND BUSINESS SUCESS", done: false }
+          ]
+        },
+        {
+          title: "C. HUMAN RESOURCE DEV'T & HUMAN RESOURCE MGMT. 25% - 25 ITEMS",
+          topics: [
+            { id: "iopsych_c1_1", text: "(1.1) HRD & HRM", done: false },
+            { id: "iopsych_c1_2", text: "(1.2) HRD & OD", done: false },
+            { id: "iopsych_c1_3", text: "(1.3) HRD & EMPLOYEE TRAINING", done: false },
+            { id: "iopsych_c2", text: "(2) IDENTIFY THE ACTIVITIES INVOLVED IN HRD", done: false },
+            { id: "iopsych_c3_1", text: "(3.1) TRAINING", done: false },
+            { id: "iopsych_c3_2", text: "(3.2) LEARNING", done: false },
+            { id: "iopsych_c3_3", text: "(3.3) CAREER DEVELOPMENT", done: false },
+            { id: "iopsych_c3_4", text: "(3.4) TALENT MANAGEMENT", done: false },
+            { id: "iopsych_c3_5", text: "(3.5) PERFORMANCE APPRAISAL", done: false },
+            { id: "iopsych_c3_6", text: "(3.6) EMPLOYEE ENGAGEMENT & EMPOWERMENT", done: false },
+            { id: "iopsych_c4_1", text: "(4.1) MANPOWER PLANNING", done: false },
+            { id: "iopsych_c4_2", text: "(4.2) STAFFING", done: false },
+            { id: "iopsych_c4_3", text: "(4.3) DEVELOPING", done: false },
+            { id: "iopsych_c4_4", text: "(4.4) MONITORING", done: false },
+            { id: "iopsych_c4_5", text: "(4.5) MAINTAINING", done: false },
+            { id: "iopsych_c4_6", text: "(4.6) MANAGING RELATIONSHIP & EVALUATING", done: false },
+            { id: "iopsych_c5", text: "(5) COMPARE THE ROLE OF HR MANAGER & HRD MANAGER", done: false }
+          ]
+        },
+        {
+          title: "D. TEAM DYNAMICS 15% - 15 ITEMS",
+          topics: [
+            { id: "iopsych_d1", text: "(1) IMPORTANCE & IMPACT OF TEAM DYNAMICS", done: false },
+            { id: "iopsych_d2", text: "(2) STAGES OF TEAM DEVELOPMENT", done: false },
+            { id: "iopsych_d3", text: "(3) GROUP PROCESSES THAT AFFECT TEAM EFFECTIVENESS", done: false },
+            { id: "iopsych_d4", text: "(4) COMMON PROBLEMS THAT OCCUR IN TEAMS", done: false },
+            { id: "iopsych_d5", text: "(5) ADRESS TEAM PROBLEMS AND IMPROVE TEAM PERFORMANCE.", done: false }
+          ]
+        },
+        {
+          title: "E. ORGANIZATIONAL CHANGE & DEVELOPMENT 20% - 20 ITEMS",
+          topics: [
+            { id: "iopsych_e1_1", text: "(1.1) ORGANIZATIONAL CHANGE & ORGANIZATIONAL DEVELOPMENT", done: false },
+            { id: "iopsych_e1_2", text: "(1.2) ORGANIZATIONAL DEVELOPMENT & ORGANIZATIONAL TRANSFORMATION", done: false },
+            { id: "iopsych_e2", text: "(2) DIFFERENT FACTORS DRIVING ORGANIZATIONAL CHANGE", done: false },
+            { id: "iopsych_e3", text: "(3) DIFFERENT TYPES OF LARGE SCALE ORGANIZATIONAL CHANGE", done: false },
+            { id: "iopsych_e4", text: "(4) EVALUATE THE DIFFERENT TYPES OF ORG. INTERVENTIONS", done: false },
+            { id: "iopsych_e5", text: "(5) DIFFERENT STRATEGIES & TECHNIQUES ORG. USES TO MANAGE CHANGE, COPE W/ CHANGE TO ACHIEVE ORG. EFFICIENCY", done: false }
+          ]
+        }
+      ]
+    },
+    devpsy: {
+      name: "DEVELOPMENTAL PSYCHOLOGY",
+      emoji: "🌱",
+      sections: [
+        {
+          title: "A. PERSPECTIVES ON NATURE AND NURTURE (5%) - 5 ITEMS",
+          topics: [
+            { id: "devpsy_a1", text: "(1) DOMAINS OF DEVELOPMENT", done: false },
+            { id: "devpsy_a2", text: "(2) 3 KINDS OF GENE-ENVIRONMENT CORRELATIONS", done: false }
+          ]
+        },
+        {
+          title: "B. RESEARCH METHODS IN DEVELOPMENTAL PSYCHOLOGY & ETHICAL CONSIDERATIONS (5%) - 5 ITEMS",
+          topics: [
+            { id: "devpsy_b1_1", text: "(1) APA GENERAL PRINCIPLES", done: false },
+            { id: "devpsy_b1_2", text: "(2) PAP GENERAL PRINCIPLES", done: false },
+            { id: "devpsy_b1_3", text: "(3) BASIC RESEARCH DESIGNS", done: false },
+            { id: "devpsy_b1_4", text: "(4) CROSS-SECTIONAL AND LONGITUDINAL STUDIES", done: false }
+          ]
+        },
+        {
+          title: "C. DEVELOPMENTAL THEORIES (25%) - 25 ITEMS",
+          topics: [
+            { id: "devpsy_c1", text: "(1) PSYCHOSEXUAL THEORY OF FREUD", done: false },
+            { id: "devpsy_c2", text: "(2) PSYCHOSOCIAL THEORY OF ERIKSON", done: false },
+            { id: "devpsy_c3", text: "(3) COGNITIVE DEVELOPMENT OF PIAGET", done: false },
+            { id: "devpsy_c4", text: "(4) KOHLBERG'S MORAL DEVELOPMENT", done: false },
+            { id: "devpsy_c5", text: "(5) BRONFENBRENNER'S ECOLOGICAL MODEL OF DEVELOPMENT", done: false },
+            { id: "devpsy_c6", text: "(6) VYGOTSKY'S SOCIOCULTURAL THEORY", done: false },
+            { id: "devpsy_c7", text: "(7) AINSWORTH'S STRANGE SITUATION & MAHLER'S ATTACHMENT THEORY", done: false },
+            { id: "devpsy_c8", text: "(8) MARCIA'S IDENTITY FORMATION", done: false },
+            { id: "devpsy_c9", text: "(9) LEARNING THEORIES BASED ON BEHAVIORISM AND SOCIAL LEARNING", done: false },
+            { id: "devpsy_c10", text: "(10) WILSON'S EVOLUTIONARY THEORY OF DEVELOPMENT", done: false }
+          ]
+        },
+        {
+          title: "D. DEVELOPMENTAL PRINCIPLES (5%) - 5 ITEMS",
+          topics: [
+            { id: "devpsy_d1", text: "(1) APPROPRIATE DEVELOPMENT PRINCIPLES IN THE STUDY OF LIFE-SPAN DEVELOPMENT", done: false }
+          ]
+        },
+        {
+          title: "E. DEVELOPMENTAL ISSUES AND TASKS ON DEVELOPMENTAL STAGES (30%) - 30 ITEMS",
+          topics: [
+            { id: "devpsy_e1_1", text: "(1) CRITICAL ISSUES DURING PRENATAL DEVELOPMENT", done: false },
+            { id: "devpsy_e1_2", text: "(2) CRITICAL ISSEUES RELATED TO PHYSICAL, COGNITIVE, SOCIO-EMOTIONAL DEVELOPMENT DURING PRENATAL DEVELOPMENT", done: false },
+            { id: "devpsy_e1_3", text: "(3) DEVELOPMENTAL ISSUES DURING CHILDHOOD, ADOLESCENCE AND ADULTHOOD", done: false },
+            { id: "devpsy_e1_4", text: "(4) CRITICAL ISSUES CONCERNING DEATH AND BEREAVEMENT", done: false },
+            { id: "devpsy_e2_1", text: "(1) EXPECTED DEVELOPMENTAL TASKS ON CHILDHOOD, ADOLESCENCE, AND ADULTHOOD", done: false }
+          ]
+        },
+        {
+          title: "F. DEVELOPMENTAL CHALLENGES AND MILESTONES ON DEVELOPMENTAL STAGES (30%) - 30 ITEMS",
+          topics: [
+            { id: "devpsy_f1_1", text: "(1) CHALLENGES DURING PRENATAL AND CHILDHOOD", done: false },
+            { id: "devpsy_f1_2", text: "(2) CHALLENGES DURING ADOLESCENCE AND ADULTHOOD", done: false },
+            { id: "devpsy_f1_3", text: "(3) DIFFERENTIATE CHALLENGES IN PRENATAL, CHILDHOOD, ADOLESCENCE AND ADULTHOOD", done: false },
+            { id: "devpsy_f1_4", text: "(4) CHALLENGES OF COPING WITH DEATH OF ANOTHER PERSON", done: false },
+            { id: "devpsy_f2_1", text: "(1-2) EXPECTED MILESTONES IN CHILDHOOD, ADOLESCENCE, AND ADULTHOOD STAGES", done: false },
+            { id: "devpsy_f2_3", text: "(3) ISSUES INVOLVED IN DECISIONS ABOUT DEATH", done: false }
+          ]
+        }
+      ]
+    },
+    psycas: {
+      name: "PSYCHOLOGICAL ASSESSMENT",
+      emoji: "📋",
+      sections: [
+        {
+          title: "A. PSYCHOMETRIC PROPERTIES & PRINCIPLES 30% - 39 ITEMS",
+          topics: [
+            { id: "psycas_a1_1", text: "(1.1) CONSTRUCTING", done: false },
+            { id: "psycas_a1_2", text: "(1.2) SELECTING", done: false },
+            { id: "psycas_a1_3", text: "(1.3) INTERPRETING TESTS", done: false },
+            { id: "psycas_a2", text: "(2) DESCRIBE THE VALUE OF DIFFERENT PSYCHOMETRIC PROPERTIES AND PRINCIPLES", done: false },
+            { id: "psycas_a3", text: "(3) JUSTIFY THE REASON FOR ACCEPTING OR REJECTING INSTRUMENTS AND TOOLS", done: false },
+            { id: "psycas_a4", text: "(4) INTERPRET AND UTILIZE TEST RESULTS BASED ON THE PSYCHOMETRIC PROPERTIES OF THE ASSESSMENT OF INSTRUMENT", done: false },
+            { id: "psycas_a5_1", text: "(5.1) INTERPRETATION OF RESULTS", done: false },
+            { id: "psycas_a5_2", text: "(5.2) USAGE OF ASSESSMENT OUTCOMES", done: false },
+            { id: "psycas_a6", text: "(6) EVALUATE THE APPLICATION OF PSYCHOMETRIC PROPERTIES IN DEVELOPMENT OF ASSESSMENT INSTRUMENTS", done: false }
+          ]
+        },
+        {
+          title: "B. RESEARCH METHODS AND STATISTICS 15% - 20 ITEMS",
+          topics: [
+            { id: "psycas_b1", text: "(1) ASCERTAIN PSYCHOMETRIC PROPERTIES ESSENTIAL IN:", done: false },
+            { id: "psycas_b2", text: "(2) EXPLAIN METHODS AND STATISTICS USED", done: false },
+            { id: "psycas_b3_1", text: "(3.1) TEST DEVELOPMENT", done: false },
+            { id: "psycas_b3_2", text: "(3.2) TEST STANDARDIZATION", done: false },
+            { id: "psycas_b3_3", text: "(3.3) STUDIES ON TESTS AND THEIR FINDINGS", done: false }
+          ]
+        },
+        {
+          title: "C. USES, BENEFITS, LIMITATIONS OF ASSESSMENT TOOLS AND INSTRUMENTS 10% - 13 ITEMS",
+          topics: [
+            { id: "psycas_c1", text: "(1) PURPOSE AND BENEFITS OF DIFFERENT ASSESSMENT METHODS AND TOOLS", done: false },
+            { id: "psycas_c2", text: "(2) APPROPRIATENESS, STRENGTHS AND LIMITATIONS OF ASSESSMENT TOOLS", done: false }
+          ]
+        },
+        {
+          title: "D. SELECTION OF ASSESSMENT METHODS AND TOOLS 15% - 19 ITEMS",
+          topics: [
+            { id: "psycas_d1", text: "(1) IDENTITY APPROPRIATE & CLARIFY RATIONALE OF ASSESSMENT METHODS, TOOLS, FOR SPECIFIC PURPOSES", done: false },
+            { id: "psycas_d2", text: "(2) SPECIFIC TOOLS NEED FOR SPECIFIC POPULATIONS, SETTINGS, CIRCUMSTANCES", done: false },
+            { id: "psycas_d3", text: "(3) SPECIFIC TOOLS NEED FOR INDIVIDUAL OR GROUP TEST", done: false },
+            { id: "psycas_d4", text: "(4) SELECTED METHODS AND INSTRUMENTS FOR SPECIFIC INFORMATION NEEDED", done: false },
+            { id: "psycas_d5", text: "(5) RECOMMENDED TOOLS FOR SPECIFIC NEEDS AND GOALS", done: false }
+          ]
+        },
+        {
+          title: "E. TEST ADMINISTRATION, SCORING, INTERPRETATION AND USAGE 15% - 20 ITEMS",
+          topics: [
+            { id: "psycas_e1", text: "(1) DETECT ERRORS AND IMPACT OF ERRORS IN TEST SELECTION, ADMINISTRATION, AND SCORING", done: false },
+            { id: "psycas_e2", text: "(2) CHALLENGES AND ANOMALIES IN TEST SELECTION, ADMINISTRATION, AND SCORING", done: false },
+            { id: "psycas_e3", text: "(3) USEFULNESS OF TESTS UNDER VARYING CONDITIONS OF TEST ADMINISTRATION, SCORING, AND INTERPRETATION", done: false }
+          ]
+        },
+        {
+          title: "F. ETHICAL PRINCIPLES AND STANDARDS OF PRACTICE 15% - 19 ITEMS",
+          topics: [
+            { id: "psycas_f1", text: "(1) TEST INTERPRETATION AND USAGE", done: false },
+            { id: "psycas_f2", text: "(2) VIOLATION OF ETHICS AND STANDARDS OF GOOD PRACTICE", done: false },
+            { id: "psycas_f3", text: "(3) SITUATIONS THAT MAY CHALLENGE THE APPLICATION OF ETHICS", done: false },
+            { id: "psycas_f4", text: "(4) DIFFERENT POSSIBLES FOR AVOIDING ETHICAL VIOLATIONS", done: false },
+            { id: "psycas_f5", text: "(5) ETHICAL APPROPRIATENESS OF PSYCHOMETRIC MATTERS", done: false }
+          ]
+        }
+      ]
+    }
+  };
+
+  const BLEPP_DATE = new Date("2026-08-19T08:00:00");
+
+  let currentUser = null;
+  let trackerData = {};
+  let unsubSnapshot = null;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function daysUntil() {
+    const now  = new Date();
+    const diff = BLEPP_DATE - now;
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  function defaultData() {
+    const d = { name: "", quote: "" };
+    SUBJECTS.forEach(s => { d[s.id] = { done: 0, total: 100 }; });
+    d.tos = {};
+    Object.keys(TOS_DATA).forEach(subjectId => {
+      d.tos[subjectId] = {};
+      TOS_DATA[subjectId].sections.forEach(section => {
+        section.topics.forEach(topic => {
+          d.tos[subjectId][topic.id] = false;
+        });
+      });
+    });
+    d.scores = {};
+    SUBJECTS.forEach(s => { d.scores[s.id] = []; });
+    d.masterlist = {
+      devpsy: [
+        { title: "Ley's DEVPSY Drills", link: "https://x.com/gmdprpm/status/1793174963475615921", status: 'pending', score: '' },
+        { title: "Papalia Test Banks", link: "https://drive.google.com/drive/folders/1KV7kCgsVn_NXs5Um6wKuU--tqRKQ7U7y", status: 'pending', score: '' },
+        { title: "Santrock Online Test Drills", link: "https://highered.mheducation.com/sites/0072880163/student_view0/chapter1/multiple_choice_quiz.html", status: 'pending', score: '' },
+        { title: "Boyd and Bee's Testbank", link: "https://x.com/vsanji_fcrossed/status/1655454597698433024", status: 'pending', score: '' },
+        { title: "DEVPSY - Abnormalities", link: "https://x.com/katierpm2024/status/1801934244958388700", status: 'pending', score: '' },
+        { title: "DEVPSY - Drills (2020 Barron)", link: "https://x.com/studywhanaya/status/1797616048214294802", status: 'pending', score: '' },
+        { title: "Theory of Love", link: "https://x.com/iskalxhista/status/1799288148004106378", status: 'pending', score: '' },
+        { title: "Drill 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSfKxLhMmXClhkfB-QkEnu0DTnEHJd_U0mczeYkt0UHKpQGClQ/viewform", status: 'pending', score: '' },
+        { title: "Drill 2", link: "https://docs.google.com/forms/d/e/1FAIpQLSdeRCtZNm2imXgcVrYp7evFe1sWAN6LH24__XExCdLzWY0guQ/viewform", status: 'pending', score: '' },
+        { title: "TOS BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSe3gC9xx6YMkghephR7HWntsxSnV-cRvrFriS79V8WGApdscg/viewform", status: 'pending', score: '' },
+        { title: "𝑯𝒆𝒓𝒆𝒅𝒊𝒕𝒚, 𝑷𝒓𝒆-𝒏𝒂𝒕𝒂𝒍 & 𝑪𝒉𝒊𝒍𝒅𝒃𝒊𝒓𝒕𝒉 𝒅𝒓𝒊𝒍𝒍", link: "https://docs.google.com/forms/d/e/1FAIpQLSfHsEzXOwh9BalADOf9Lk9ZrSpp1NM6iM4SwWZXEoMmqkBVuA/viewform", status: 'pending', score: '' },
+        { title: "𝑰𝒏𝒇𝒂𝒏𝒄𝒚 𝒅𝒓𝒊𝒍𝒍", link: "https://docs.google.com/forms/d/e/1FAIpQLSd84bBGhqpkyFHUJeGQd9AffG5d0tLxlIMBjVI1ukHrw1WeqA/viewform", status: 'pending', score: '' },
+        { title: "𝑬𝒂𝒓𝒍𝒚 𝑪𝒉𝒊𝒍𝒅𝒉𝒐𝒐𝒅 𝒅𝒓𝒊𝒍𝒍", link: "https://docs.google.com/forms/d/e/1FAIpQLSd8cHY15uAZMB5i5JnyApQ3PB0FrvKnwDHztjkRuOApYsYpUA/viewform", status: 'pending', score: '' },
+        { title: "𝑴𝒊𝒅𝒅𝒍𝒆 𝑨𝒏𝒅 𝑳𝒂𝒕𝒆 𝑪𝒉𝒊𝒍𝒅𝒉𝒐𝒐𝒅 𝒅𝒓𝒊𝒍𝒍", link: "https://docs.google.com/forms/d/e/1FAIpQLSfgP7-Q-B3rQLcVYpD7cfYS3ZnU26pff4Tgx9Umx-IorobGaA/viewform", status: 'pending', score: '' },
+        { title: "Drill 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSenPFaM6H-P8sSe873Z2Ah4uOO1UK4ZcZV9ytv2T_gFG_Ij5g/viewform", status: 'pending', score: '' },
+        { title: "Drill 2", link: "https://docs.google.com/forms/d/e/1FAIpQLSf-hkMAlbIXgsQkX633869NJFQKej8nwMT5-Y0fFE-feuhbEQ/viewform", status: 'pending', score: '' },
+        { title: "Drill 3", link: "https://docs.google.com/forms/d/e/1FAIpQLSdxacd8Oo7Ivw25IJUOg-Jbo0bCqjpPPkCk8zZm6SdKKatr8w/viewform", status: 'pending', score: '' },
+        { title: "study of human development", link: "https://docs.google.com/forms/d/1_o3zQxDKbfOSM9bJDii5pAntFK2iUVLsQEsLj2paWPA/viewform?edit_requested=true", status: 'pending', score: '' },
+        { title: "drill 2", link: "https://docs.google.com/forms/d/14VHQNStbidl7yjT75xG7kF-ayqdI1PRW9EPCuolXI4Q/viewform?edit_requested=true", status: 'pending', score: '' },
+        { title: "schedules of reinforcement", link: "https://docs.google.com/forms/d/e/1FAIpQLSf6pLebXeNRkKHQxTPvVb48zcDjzotB6GTUE_V8WljgdxeH4g/viewform", status: 'pending', score: '' },
+        { title: "Dev Psy 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSela-LqTaoe5Tl0EK47c8ZdUyd-V8QL9SYRnWsfCvuHtME2Hw/viewform", status: 'pending', score: '' },
+        { title: "research methods", link: "https://docs.google.com/forms/d/e/1FAIpQLSdR0ZMCTGFRDWJEfWy_Bq3a2keRsMcONobM4w5UnHZdYEzgFA/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfxHWceEgDJ_HsDCcBdRqh45-05MSI6LLMIVC4jZbNhe6L3Vw/viewform", status: 'pending', score: '' },
+        { title: "genetics and heredity", link: "https://docs.google.com/forms/d/e/1FAIpQLSdv8S-3MC1FJYCdcuUTXTBZLg_90loAuG_xtohECkxX0t1zPA/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://www.proprofs.com/quiz-school/story.php?title=psychology-final-exam_2", status: 'pending', score: '' },
+        { title: "practice test", link: "https://www.proprofs.com/quiz-school/story.php?title=developmental-psychology-psyc110-exam-2-ch-58", status: 'pending', score: '' },
+        { title: "practice test", link: "https://www.proprofs.com/quiz-school/story.php?title=developmental-psychology-psyc110-exam-3-ch-912", status: 'pending', score: '' },
+        { title: "abnormalities", link: "https://docs.google.com/forms/d/e/1FAIpQLSck2KooMu2mvJ2wmMrmkzsjzoAeDn8bu-0TpHP2pbZ2CF2hYg/viewform", status: 'pending', score: '' },
+        { title: "theory of love", link: "https://docs.google.com/forms/d/e/1FAIpQLSd4vF-6ZCBd-bkHQFD2TWGDBpvx_xUcdQSu4yjLuL3XSol20A/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSciUlJ3530uHwNaYEzpUqh5B4Qe-zEDB4sRv19zksjt_IOmyQ/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSf8HvyVfPYHTF-5NLUT6_gFz6FbOpEEdynHHBWP_dt5tXqyRw/viewform", status: 'pending', score: '' },
+        { title: "basics", link: "https://docs.google.com/forms/d/e/1FAIpQLSfKxLhMmXClhkfB-QkEnu0DTnEHJd_U0mczeYkt0UHKpQGClQ/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLScKoE7i2zmxmGrpJfEv5xRs7hwWrZnOSzar6VjlSoLGYExCZw/viewform?fbzx=6513121097815744265", status: 'pending', score: '' },
+        { title: "tos-based", link: "https://docs.google.com/forms/d/e/1FAIpQLSe3gC9xx6YMkghephR7HWntsxSnV-cRvrFriS79V8WGApdscg/viewform?pli=1&pli=1", status: 'pending', score: '' },
+        { title: "life-span development", link: "https://docs.google.com/forms/d/e/1FAIpQLSciQ53qRkcbvWKgNU4xX4fralid4YD14YEZ7yF6cyYEQ3AjsQ/viewform", status: 'pending', score: '' },
+        { title: "life-span perspective", link: "https://docs.google.com/forms/d/e/1FAIpQLSe7W05ZjB7EwwiNsVNvwQHyvNs2X-bYf0rnpuADty3MPK3Wfw/viewform", status: 'pending', score: '' },
+        { title: "research in life-span development", link: "https://docs.google.com/forms/d/e/1FAIpQLSfy_OVP3nxx4lEoIuL8kSPNagWH_UlN2Ey8RYisntmKlz-eAw/viewform", status: 'pending', score: '' },
+        { title: "evolutionary perspective", link: "https://docs.google.com/forms/d/e/1FAIpQLSdwGlWfaRDCU2V4HXPd_dPx2hK-VjVBSrzCS6gydWSZeVUdVA/viewform", status: 'pending', score: '' },
+        { title: "contextual perspective", link: "https://docs.google.com/forms/d/e/1FAIpQLScDyQWO2XG7nOEVhEU0zD9uDATDRc4JX4Vm8QmhGVsWCHATXg/viewform", status: 'pending', score: '' },
+        { title: "humanistic theory", link: "https://docs.google.com/forms/d/e/1FAIpQLScOoU0qchcyFT2Jj27xUpxlLhFhMsvKdfbt2xW5XqyoxceMSg/viewform", status: 'pending', score: '' },
+        { title: "cognitive theory", link: "https://docs.google.com/forms/d/e/1FAIpQLSd1Llg4LXaH6LxCf2X45l9Y7Vdb9P8U7H5OgLvZFxy2MIvJWg/viewform", status: 'pending', score: '' },
+        { title: "behaviorism and social cognitive learning theory", link: "https://docs.google.com/forms/d/e/1FAIpQLSdkpz7NDEI2cVAmMfMxjh1QQ1xnfjyUfzhOEXhuuRLKMjg2zw/viewform", status: 'pending', score: '' },
+        { title: "psychosocial theory", link: "https://docs.google.com/forms/d/e/1FAIpQLSc-8vktGoi5vSR6_wIf5DRzIZm_H2vIZwJ7xFBIXAFL_YaXFQ/viewform", status: 'pending', score: '' },
+        { title: "psychodynamic theory", link: "https://docs.google.com/forms/d/e/1FAIpQLScd8jYd5sFpYhjHPDbBwbg3h3KR9DB8mx9DUb28BJGie20SXw/viewform", status: 'pending', score: '' },
+        { title: "prenatal development", link: "https://docs.google.com/forms/d/e/1FAIpQLScI00vQP5gQQMTVkd4p4zdG_UA9TbYdWvPWonxhds04sLQu6Q/viewform", status: 'pending', score: '' },
+        { title: "practice test (8 PARTS)", link: "https://docs.google.com/forms/d/e/1FAIpQLScHXcr74QtOxWIYbaAZ4VKLv5WyK0Majh7keiRQm_gPlHBTNQ/viewform", status: 'pending', score: '' },
+        { title: "heredity, pre-natal and childbirth", link: "https://docs.google.com/forms/d/e/1FAIpQLSfHsEzXOwh9BalADOf9Lk9ZrSpp1NM6iM4SwWZXEoMmqkBVuA/viewform", status: 'pending', score: '' },
+        { title: "infancy", link: "https://docs.google.com/forms/d/e/1FAIpQLSd84bBGhqpkyFHUJeGQd9AffG5d0tLxlIMBjVI1ukHrw1WeqA/viewform", status: 'pending', score: '' },
+        { title: "early childhood", link: "https://docs.google.com/forms/d/e/1FAIpQLSd8cHY15uAZMB5i5JnyApQ3PB0FrvKnwDHztjkRuOApYsYpUA/viewform", status: 'pending', score: '' },
+        { title: "middle and late childhood", link: "https://docs.google.com/forms/d/e/1FAIpQLSfgP7-Q-B3rQLcVYpD7cfYS3ZnU26pff4Tgx9Umx-IorobGaA/viewform", status: 'pending', score: '' },
+        { title: "theoretical perspective", link: "https://docs.google.com/forms/d/e/1FAIpQLSf3zdzP1zHMck6efcdA-QTXZjZH5_nJYG_b_3KQpIQ8uGelCQ/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSeTrZA6o-pM69LrWvm-kiGNvvSsvLqYfVlk3CKDCHOkCTIUyw/viewform", status: 'pending', score: '' },
+        { title: "Developmental Psychology - Drill 2", link: "https://docs.google.com/forms/d/e/1FAIpQLSdeRCtZNm2imXgcVrYp7evFe1sWAN6LH24__XExCdLzWY0guQ/viewform", status: 'pending', score: '' },
+        { title: "Developmental Psychology - Drill 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSfKxLhMmXClhkfB-QkEnu0DTnEHJd_U0mczeYkt0UHKpQGClQ/viewform", status: 'pending', score: '' },
+        { title: "DEV PSYCHOLOGY TOS BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSe3gC9xx6YMkghephR7HWntsxSnV-cRvrFriS79V8WGApdscg/viewform", status: 'pending', score: '' },
+        { title: "Developmental Psychology Drill", link: "https://docs.google.com/forms/d/e/1FAIpQLSfJsXW1g12XnAGYXe6BAWjMTkhjfbvc5ewnBH19rxGO_ySvBg/viewform", status: 'pending', score: '' },
+        { title: "Developmental Theories Drill", link: "https://docs.google.com/forms/d/e/1FAIpQLSfmVJPuZcCiRmlndnkYKVNyxqMRKQq-RIJJJoDHODmc6ros9Q/viewform", status: 'pending', score: '' },
+        { title: "https://highered.mheducation.com/sites/007249199x/student_view0/chapter13/multiple_choice_quiz.html", link: "https://highered.mheducation.com/sites/007249199x/student_view0/chapter13/multiple_choice_quiz.html", status: 'pending', score: '' },
+        { title: "https://drive.google.com/file/d/1TiYohQAOB2a1FwU1hI9xMJa-IB_UMV3-/view", link: "https://drive.google.com/file/d/1TiYohQAOB2a1FwU1hI9xMJa-IB_UMV3-/view", status: 'pending', score: '' },
+        { title: "https://drive.google.com/drive/folders/186-hEhEGMLIMZGC6wL_xjYihb2aYUk4u?usp=drive_link", link: "https://drive.google.com/drive/folders/186-hEhEGMLIMZGC6wL_xjYihb2aYUk4u?usp=drive_link", status: 'pending', score: '' },
+        { title: "Research Methods", link: "https://docs.google.com/forms/d/e/1FAIpQLSdR0ZMCTGFRDWJEfWy_Bq3a2keRsMcONobM4w5UnHZdYEzgFA/viewform", status: 'pending', score: '' },
+        { title: "research in life-span development", link: "https://docs.google.com/forms/d/e/1FAIpQLSfy_OVP3nxx4lEoIuL8kSPNagWH_UlN2Ey8RYisntmKlz-eAw/viewform", status: 'pending', score: '' },
+        { title: "evolutionary perspective", link: "https://docs.google.com/forms/d/e/1FAIpQLSdwGlWfaRDCU2V4HXPd_dPx2hK-VjVBSrzCS6gydWSZeVUdVA/viewform", status: 'pending', score: '' },
+        { title: "contextual perspective", link: "https://docs.google.com/forms/d/e/1FAIpQLScDyQWO2XG7nOEVhEU0zD9uDATDRc4JX4Vm8QmhGVsWCHATXg/viewform", status: 'pending', score: '' },
+        { title: "humanistic theory", link: "https://docs.google.com/forms/d/e/1FAIpQLScOoU0qchcyFT2Jj27xUpxlLhFhMsvKdfbt2xW5XqyoxceMSg/viewform", status: 'pending', score: '' },
+        { title: "cognitive theory", link: "https://docs.google.com/forms/d/e/1FAIpQLSd1Llg4LXaH6LxCf2X45l9Y7Vdb9P8U7H5OgLvZFxy2MIvJWg/viewform", status: 'pending', score: '' },
+        { title: "behaviorism and social cognitive learning theory", link: "https://docs.google.com/forms/d/e/1FAIpQLSdkpz7NDEI2cVAmMfMxjh1QQ1xnfjyUfzhOEXhuuRLKMjg2zw/viewform", status: 'pending', score: '' },
+        { title: "psychosocial theory", link: "https://docs.google.com/forms/d/e/1FAIpQLSc-8vktGoi5vSR6_wIf5DRzIZm_H2vIZwJ7xFBIXAFL_YaXFQ/viewform", status: 'pending', score: '' },
+        { title: "psychodynamic theory", link: "https://docs.google.com/forms/d/e/1FAIpQLScd8jYd5sFpYhjHPDbBwbg3h3KR9DB8mx9DUb28BJGie20SXw/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSf8HvyVfPYHTF-5NLUT6_gFz6FbOpEEdynHHBWP_dt5tXqyRw/viewform", status: 'pending', score: '' },
+        { title: "Theoretical Perspective", link: "https://docs.google.com/forms/d/e/1FAIpQLSdlwmKnyXb4MEKemeLzplConj4D9ToNOqd4tPpBjccSCt7lPg/viewform", status: 'pending', score: '' },
+        { title: "study of human development", link: "https://docs.google.com/forms/d/1_o3zQxDKbfOSM9bJDii5pAntFK2iUVLsQEsLj2paWPA/viewform?edit_requested=true", status: 'pending', score: '' },
+        { title: "heredity, pre-natal and childbirth", link: "https://docs.google.com/forms/d/e/1FAIpQLSfHsEzXOwh9BalADOf9Lk9ZrSpp1NM6iM4SwWZXEoMmqkBVuA/viewform", status: 'pending', score: '' }
+      ],
+      abpsych: [
+        { title: "ABPSY - Prac. Drill 1", link: "https://x.com/studywhanaya/status/1797615448172929090", status: 'pending', score: '' },
+        { title: "ABPSY: Mini Quizzes", link: "https://x.com/bibblespace/status/1755595015848681829", status: 'pending', score: '' },
+        { title: "ABPSY TOS-Based Drills", link: "https://forms.gle/PNALu5FNmSwNDs439", status: 'pending', score: '' },
+        { title: "ABPSY More Drills", link: "https://x.com/psychdarchives/status/1732234572887359649", status: 'pending', score: '' },
+        { title: "ABPSY Drill", link: "https://x.com/slovanly/status/1679368182279323649", status: 'pending', score: '' },
+        { title: "Personality Disorders", link: "https://x.com/gmdprpm/status/1804052689128689994", status: 'pending', score: '' },
+        { title: "ABPSY Drills", link: "https://x.com/descartesrpm/status/1815011153581359445", status: 'pending', score: '' },
+        { title: "AbPsy Drill", link: "https://t.co/elz7AombhI", status: 'pending', score: '' },
+        { title: "Drill 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSeoyKe376nZ-lWdOHPxw4JY55T5rPCIKRGo_DuT5-HU0gOF8A/viewform", status: 'pending', score: '' },
+        { title: "Drill 2", link: "https://docs.google.com/forms/d/e/1FAIpQLSfsHA5qaugHVzJNwDnoK3bmdeX6jU2SwlRlZdQ86dp2WSvgRg/viewform", status: 'pending', score: '' },
+        { title: "Drill 3", link: "https://docs.google.com/forms/d/e/1FAIpQLSehGa_j2RxO0X12BowInvq3xbqdj3_1WMOJftFl54hJNX0BxA/viewform", status: 'pending', score: '' },
+        { title: "Drill 4", link: "https://docs.google.com/forms/d/e/1FAIpQLScBCCpLBc1hKxF5BsdDw1mUXZbxYIVP3J92Huv6gNQ_yHzL4w/viewform", status: 'pending', score: '' },
+        { title: "TOS Based", link: "https://docs.google.com/forms/d/e/1FAIpQLScdjvM1pgsgEFQp2sW1Qf1iUBMo67vun-QjH_Z4wMzsxJBmfA/viewform", status: 'pending', score: '' },
+        { title: "Master The Basics: Part 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSemgNJePC-BjLR4UxYPkvDCyj37VGpqNkWaSqL8lwrDOACAEg/viewform", status: 'pending', score: '' },
+        { title: "Master The Basics: Part 2", link: "https://docs.google.com/forms/d/e/1FAIpQLSf8Lyh-TaatBTkrCYUzsqV1-QKgzZRMB0E5uwGJ0-0h3cMUEg/viewform", status: 'pending', score: '' },
+        { title: "10 items", link: "https://docs.google.com/forms/d/e/1FAIpQLSe0Fx3cREy2SaZ6myrjbps9DWpNRqRRGC2L0GLLoZZM0IEn5g/viewform", status: 'pending', score: '' },
+        { title: "10 items", link: "https://docs.google.com/forms/d/e/1FAIpQLSdYQaSQZDmO737dnZmW1_FDTzQR2qXhqQClXAckj1LAEh_Rrg/viewform", status: 'pending', score: '' },
+        { title: "30 items", link: "https://docs.google.com/forms/d/e/1FAIpQLSelv1JVyHlMQgxMjIXCjnWLntLTfbm5k_BQH2sbXihY331x-g/viewform", status: 'pending', score: '' },
+        { title: "Neurodevelopmental Disorder", link: "https://docs.google.com/forms/d/e/1FAIpQLScZiXlBCvJGder9locHEXGMFKJ0KkRg7PCdMUXEE-_RUd9xCA/viewform", status: 'pending', score: '' },
+        { title: "Neurocognitive Disorder", link: "https://docs.google.com/forms/d/e/1FAIpQLSd8HGlEuDl-U5wFD8B-r9Ly_OeJ4cywe7H0CUwspAuxipZzaw/viewform", status: 'pending', score: '' },
+        { title: "20 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSfAgmr7b7yjj4zNayptnb-0bA4xlvaj4UtS7had3LaRwi7Ntg/viewform", status: 'pending', score: '' },
+        { title: "15 Items (Part 2)", link: "https://docs.google.com/forms/d/e/1FAIpQLSf2Zs6d_HPnUXHSzPR2t0nfMruFCVfLXj4TTBlXJF6cao8vCQ/viewform", status: 'pending', score: '' },
+        { title: "20 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSd6_L3dr7rTGAhvOF7FOBNoGuC2EEIFh-LqmlaNLLnMsPQweA/viewform", status: 'pending', score: '' },
+        { title: "15 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSd6_L3dr7rTGAhvOF7FOBNoGuC2EEIFh-LqmlaNLLnMsPQweA/viewform", status: 'pending', score: '' },
+        { title: "50 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScGNFzguSVxbwnI7a4AdW9A4IXMlGMxuIRkg6JTlMzj1-Y-3A/viewform", status: 'pending', score: '' },
+        { title: "50 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScGNFzguSVxbwnI7a4AdW9A4IXMlGMxuIRkg6JTlMzj1-Y-3A/viewform", status: 'pending', score: '' },
+        { title: "35 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScDcruqpz08UrQKYteLRJgfzgU9_oy67NTGtRB6XOqWIoNUQw/viewform", status: 'pending', score: '' },
+        { title: "DSM-5: Self-Exam Questions", link: "https://drive.google.com/file/d/1Z5KroAZwZxfd_-9YzR9AduZQBvyDqRmc/view", status: 'pending', score: '' },
+        { title: "Differential Diagnosis (20 Items)", link: "https://docs.google.com/forms/d/e/1FAIpQLSdMjJVlohIcems1tq8jyBCubMGhdTG094IrSPqlvkL-gBrO6Q/viewform", status: 'pending', score: '' },
+        { title: "Differential Diagnosis P2 (20 Items)", link: "https://docs.google.com/forms/d/e/1FAIpQLSeeNTMcYzV3e0Viw3S3YxbtXJPM9Zv1-RdCA7fls2I-V2XAlA/viewform", status: 'pending', score: '' },
+        { title: "Test Banks (Chapter 1-16)", link: "https://drive.google.com/drive/folders/1jXJNOLwcAF67qMVtJVPJbryvYZ87C6u5", status: 'pending', score: '' },
+        { title: "DSM-5 & DSM-5-TR Drill", link: "https://docs.google.com/forms/d/e/1FAIpQLSfh37mFTeJzMZTUoR7GX01hPoD95E8WoulxwCKln_yYJfCmjA/viewform", status: 'pending', score: '' },
+        { title: "Anxiety Disorders", link: "https://docs.google.com/forms/d/e/1FAIpQLSdcJQF3Jr8XFdI4kX7xjmLi8AMbRUxisDq39T9_WEiSEJ5Cbg/viewform", status: 'pending', score: '' },
+        { title: "Personality Disorder", link: "https://docs.google.com/forms/d/e/1FAIpQLSeP3OI7uKy39FGiwtotLW6Owf4xOcapog2qoFuLhZtPO8bk9w/viewform", status: 'pending', score: '' },
+        { title: "Neurocognitive Disorder", link: "https://docs.google.com/forms/d/e/1FAIpQLScp1ONEzh4Ps1rEGypjfjmWqwZsHoiDCmk8DtzzJ5oEcl-uzw/viewform", status: 'pending', score: '' },
+        { title: "Test Banks/ PMETLE Drills", link: "https://drive.google.com/drive/folders/1YByCVQSj8ZxVQZqD7l_V43SSuend3tKq", status: 'pending', score: '' },
+        { title: "20 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSd6_L3dr7rTGAhvOF7FOBNoGuC2EEIFh-LqmlaNLLnMsPQweA/formResponse", status: 'pending', score: '' },
+        { title: "Chapter 1", link: "https://docs.google.com/forms/d/1rK4vB6x-66AuzNBztUG2vu91E4lWCWuO03w9Gvfe5Z8/viewform?edit_requested=true", status: 'pending', score: '' },
+        { title: "ab psy test bank (155 pgs)", link: "https://drive.google.com/file/d/1Lg1T9MiH4KnsasVtRR03xrGk7Zxo1t9S/view", status: 'pending', score: '' },
+        { title: "TOS BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSeAmu5CkqqLHlBuAWsRf1BEggGYyXUAdzm4yyHlTQq3X7rjBg/viewform", status: 'pending', score: '' },
+        { title: "Ab Psy 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSdbpJe4XSQGF3iy-86FOOKafSCRax0vfURk53q6efr2fx7AsA/viewform", status: 'pending', score: '' },
+        { title: "AB PSYCH: Anxiety and Trauma Related Disorders", link: "https://docs.google.com/forms/d/e/1FAIpQLScV35lhEdhYFWrZVHRYbvXDaLHT2L4ZhINJXNLu4M55JXL58Q/viewform", status: 'pending', score: '' },
+        { title: "CULTURE-BOUND SYNDROMES", link: "https://docs.google.com/forms/d/e/1FAIpQLSeU9Kmn6BvlY4_hJ4rg1HQkxi2itcKKyiiFHDy8PqAQWCZL_A/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSd6_L3dr7rTGAhvOF7FOBNoGuC2EEIFh-LqmlaNLLnMsPQweA/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSf2Zs6d_HPnUXHSzPR2t0nfMruFCVfLXj4TTBlXJF6cao8vCQ/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSdBvjvQChnzhn2m8CmthXoDFba61NtJIf3HX2IPW-wr0UwFyQ/viewform?pli=1&pli=1", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfAgmr7b7yjj4zNayptnb-0bA4xlvaj4UtS7had3LaRwi7Ntg/viewform", status: 'pending', score: '' },
+        { title: "NEUROCOGNITIVE DISORDERS", link: "https://docs.google.com/forms/d/e/1FAIpQLSd8HGlEuDl-U5wFD8B-r9Ly_OeJ4cywe7H0CUwspAuxipZzaw/viewform", status: 'pending', score: '' },
+        { title: "NEURODEVELOPMENTAL DISORDERS", link: "https://docs.google.com/forms/d/e/1FAIpQLScZiXlBCvJGder9locHEXGMFKJ0KkRg7PCdMUXEE-_RUd9xCA/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSelv1JVyHlMQgxMjIXCjnWLntLTfbm5k_BQH2sbXihY331x-g/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSdYQaSQZDmO737dnZmW1_FDTzQR2qXhqQClXAckj1LAEh_Rrg/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSe0Fx3cREy2SaZ6myrjbps9DWpNRqRRGC2L0GLLoZZM0IEn5g/viewform", status: 'pending', score: '' },
+        { title: "basics 2", link: "https://docs.google.com/forms/d/e/1FAIpQLSf8Lyh-TaatBTkrCYUzsqV1-QKgzZRMB0E5uwGJ0-0h3cMUEg/viewform", status: 'pending', score: '' },
+        { title: "basics 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSemgNJePC-BjLR4UxYPkvDCyj37VGpqNkWaSqL8lwrDOACAEg/viewform", status: 'pending', score: '' },
+        { title: "tos-based", link: "https://docs.google.com/forms/d/e/1FAIpQLScdjvM1pgsgEFQp2sW1Qf1iUBMo67vun-QjH_Z4wMzsxJBmfA/viewform", status: 'pending', score: '' },
+        { title: "idd drill", link: "https://docs.google.com/forms/d/1DqFUmrFGCr4hJHK3Q5lZwUAi4mIqf7GhXuJiSm11RBk/viewform?edit_requested=true", status: 'pending', score: '' },
+        { title: "death and dying", link: "https://docs.google.com/forms/d/e/1FAIpQLSdNFCZ3xJWiOy5uO45do4alLJg_9_tWjV54SI2m8yIhk0-76Q/viewform", status: 'pending', score: '' },
+        { title: "differential diagnosis", link: "https://docs.google.com/forms/d/e/1FAIpQLSfpD0lu1GGpPYYdYoO9I3xuE4dEYWqcZm4II96gufm5vtD5hg/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSddZ_v40pi2Vn4UK6aJJZL-qnEPP0AOJ-wouSGoWUq-Pt9Zzg/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLScDEmBS0WBwuUYU_Wy0-2zQus2JeTS8uet9lDVqS5i4-P9mlQ/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLScr7Q9u2k7ph-W3KqV-anhIu2LoN7Dp6Q4CEueiiRTP9-QRHw/viewform", status: 'pending', score: '' },
+        { title: "therapeutic intervention", link: "https://docs.google.com/forms/d/e/1FAIpQLSdb4Vs5397BLcZlTasc_au6W44RsGS1VyESRs_XP5L4K9uKWg/viewform", status: 'pending', score: '' },
+        { title: "treatments and etiology", link: "https://x.com/storm_rpm24/status/1807026653098659881?s=46", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLScea5RNqBQNqYlidq5Sz3cDBDkQTCPwhcMwkUX_Z7vWsxU0ew/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSdcJQF3Jr8XFdI4kX7xjmLi8AMbRUxisDq39T9_WEiSEJ5Cbg/viewform", status: 'pending', score: '' },
+        { title: "differential diagnosis pt. 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSeeNTMcYzV3e0Viw3S3YxbtXJPM9Zv1-RdCA7fls2I-V2XAlA/viewform", status: 'pending', score: '' },
+        { title: "differential diagnosis pt. 2", link: "https://docs.google.com/forms/d/e/1FAIpQLSdMjJVlohIcems1tq8jyBCubMGhdTG094IrSPqlvkL-gBrO6Q/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfRa5eYJJIgCGMzujuYESHOnrw92xznlpkITBHBgLAH_WbD_Q/viewform", status: 'pending', score: '' },
+        { title: "criteria for abnormality", link: "https://docs.google.com/forms/d/e/1FAIpQLSdEIepYj1h0_SYE3Zb0KMcwHi8T4oIvQzgJaNiphmCRHsdwNw/viewform", status: 'pending', score: '' },
+        { title: "tos-based", link: "https://docs.google.com/forms/d/e/1FAIpQLScdjvM1pgsgEFQp2sW1Qf1iUBMo67vun-QjH_Z4wMzsxJBmfA/viewform", status: 'pending', score: '' },
+        { title: "personality disorders", link: "https://docs.google.com/forms/d/e/1FAIpQLSc5tA7oyaDJiKwD89nnCEgf9VkGtMu12Ygqz1c54FKxE_dSig/viewform", status: 'pending', score: '' },
+        { title: "anxiety disorders", link: "https://docs.google.com/forms/d/e/1FAIpQLSchxP3voWfplyVfXWVSSQ4d5D6jCGZLv1t21Iu47roK1MfNlQ/viewform", status: 'pending', score: '' },
+        { title: "trauma and stressor-related disorders", link: "https://docs.google.com/forms/d/e/1FAIpQLSdm2_lQ_cGVG1jg-m6HV2Wnyt2ysAKgxdZoadXvcdhCHvPWbg/viewform", status: 'pending', score: '' }
+      ],
+      psycas: [
+        { title: "RA 11036", link: "https://x.com/storm_rpm24/status/1798980913789125056", status: 'pending', score: '' },
+        { title: "Reliability", link: "https://x.com/hannadiariess/status/1770773627023016325", status: 'pending', score: '' },
+        { title: "Psychological Testing", link: "https://x.com/yunorpm/status/1673259529482412032", status: 'pending', score: '' },
+        { title: "PSYCAS - TOS Based", link: "https://x.com/Angeee_licaaaaa/status/1691043235416997889", status: 'pending', score: '' },
+        { title: "Statistics - DRILL", link: "https://x.com/katierpm2024/status/1796952602330231293", status: 'pending', score: '' },
+        { title: "Ethics - DRILLS", link: "https://x.com/katierpm2024/status/1795694582447100276", status: 'pending', score: '' },
+        { title: "RA 10029 - DRILLS", link: "https://x.com/storm_rpm24/status/1798678266947285350", status: 'pending', score: '' },
+        { title: "PSYCAS - Practice Test", link: "https://x.com/Angeee_licaaaaa/status/1691043347149000704", status: 'pending', score: '' },
+        { title: "PSYCAS - Complation of Drills", link: "https://drive.google.com/drive/u/0/folders/1DPFuNAIehTQOI__xKn1Hh-E50hmZrYYp", status: 'pending', score: '' },
+        { title: "Validity Drills", link: "https://x.com/iskalxhista/status/1792825340009865244", status: 'pending', score: '' },
+        { title: "Telepsychology - Drills", link: "https://x.com/storm_rpm24/status/1798630592399188300", status: 'pending', score: '' },
+        { title: "Psychological Test - DRILLS", link: "https://x.com/storm_rpm24/status/1807694361683181925", status: 'pending', score: '' },
+        { title: "Psychological Test DRILL", link: "https://x.com/slovanly/status/1677271784016740354", status: 'pending', score: '' },
+        { title: "Psychological Assessment Drills by Hannah", link: "https://x.com/hannadiariess/status/1770773381744300296", status: 'pending', score: '' },
+        { title: "RIASEC", link: "https://x.com/katierpm2024/status/1812405079464620286", status: 'pending', score: '' },
+        { title: "TOS BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSdt7VUFLu3hmbq4sJRg0fKwUHnn2p4v_xVitwdgnsJg4hdjCg/viewform", status: 'pending', score: '' },
+        { title: "RELIABILITY", link: "https://docs.google.com/forms/d/e/1FAIpQLSek7IbZp5bzSo7Zw7RcYTlP6VBjY22FTBOmrEV1YQ7GV5boaA/viewform", status: 'pending', score: '' },
+        { title: "Glossary of Terms", link: "https://docs.google.com/forms/d/e/1FAIpQLScMkNwEvu-6xhiQdSBVYONg00iVTfU3h22GAWoX32ttIn2Syw/viewform", status: 'pending', score: '' },
+        { title: "Stat of tests", link: "https://docs.google.com/forms/d/e/1FAIpQLScDcruqpz08UrQKYteLRJgfzgU9_oy67NTGtRB6XOqWIoNUQw/viewform", status: 'pending', score: '' },
+        { title: "Practice Drills 10 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSf7vGA9IJAtDspaX1xyzae2lyYi1akOYCXo0l3JMLu-j4lFlA/viewform", status: 'pending', score: '' },
+        { title: "30 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSfvAL1PtLZ8DzK9WDJR5HofRFBiqSRsc39WCFUaLSFC_P88Pg/viewform", status: 'pending', score: '' },
+        { title: "50 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScGNFzguSVxbwnI7a4AdW9A4IXMlGMxuIRkg6JTlMzj1-Y-3A/viewform", status: 'pending', score: '' },
+        { title: "10 Items", link: "https://docs.google.com/document/d/1SA4lD_38UhTGrSD0VUFPvNs0QxCX7fCE/edit", status: 'pending', score: '' },
+        { title: "50 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScGNFzguSVxbwnI7a4AdW9A4IXMlGMxuIRkg6JTlMzj1-Y-3A/viewform", status: 'pending', score: '' },
+        { title: "Chapter 1-15", link: "https://drive.google.com/drive/folders/1fOJussI257mizoir_fWNnAabcQJ0i6MT", status: 'pending', score: '' },
+        { title: "50 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScg_TwMtJ8GdD2aKElR2x38u54_m_EVmE4p8e4gLo4NV0Ok9g/viewform", status: 'pending', score: '' },
+        { title: "PAP Code of Ethics", link: "https://docs.google.com/forms/d/e/1FAIpQLSedQRLH_pTPSs92ww6sWxyzrEFW3vcXEaTjzcw3xv1qIWxaRQ/viewform", status: 'pending', score: '' },
+        { title: "200 Items", link: "https://docs.google.com/document/d/19Q3lAHwGr8shYkmNAiCxY5HMz6vYlbVx/edit", status: 'pending', score: '' },
+        { title: "50 Items", link: "https://www.studocu.com/ph/document/caraga-state-university/psychological-assessment/psychological-assessment-50-items-diagnostic-exam-questions-answers-and-rationalization/38866535", status: 'pending', score: '' },
+        { title: "Practice Test -120 Pages", link: "https://drive.google.com/file/d/1ZBSRatZp3zsABH2IRRVc1nr5IJ-GJQtm/view", status: 'pending', score: '' },
+        { title: "Chapters 1-15", link: "https://drive.google.com/drive/folders/1iXQuOX8rOXjcorszjx2QbUVYUHzhphRj", status: 'pending', score: '' },
+        { title: "Short Conceptual Quiz re: Psychological Theories", link: "https://docs.google.com/forms/d/e/1FAIpQLSdcm-h0zlk7ebcHUCLfDeahyyxfofun2pOejaC-C8tV8Jxlsg/viewform", status: 'pending', score: '' },
+        { title: "Validity", link: "https://docs.google.com/forms/d/e/1FAIpQLSdwMnXRNezwcjs9XWq3Cb5RDqUwKDgPm8WcgdsvIGQd4lER3w/viewform", status: 'pending', score: '' },
+        { title: "Random PSYS Drill", link: "https://twitter.com/gmdprpm/status/1765631065983766572?t=DztOInL1YnPHGEdECCNdZA&s=19", status: 'pending', score: '' },
+        { title: "15-item drill", link: "https://docs.google.com/forms/d/e/1FAIpQLSe1TRDKuhg8QfXFokEatI0lI17QK3iio9UR8t6G814nhoABtg/viewform", status: 'pending', score: '' },
+        { title: "Psychological Interventions", link: "https://docs.google.com/forms/d/e/1FAIpQLSfzbEYxCMU4GapKO4BxY5YXURS_iuGjuOood0kvNrI7gr7rFg/viewform", status: 'pending', score: '' },
+        { title: "Cohen Chapters", link: "https://drive.google.com/drive/folders/1DPFuNAIehTQOI__xKn1Hh-E50hmZrYYp", status: 'pending', score: '' },
+        { title: "Psychologfical Tests of Abbreviation (recall)", link: "https://docs.google.com/forms/d/e/1FAIpQLSdgEHYf00ycU8Y6WdssRq9DVfKdZ7rwmFxep9gEswG69WxHfw/viewform", status: 'pending', score: '' },
+        { title: "Psych Assess 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSegPf9Sw1wX80jzKfCT3jgV5gg8p6VVjlaD6idkyQ5YWTG_tw/viewform", status: 'pending', score: '' },
+        { title: "TOS-BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSdMs7tJjRg9WjU64s6DWMIvoTKi6UO7HysV8mV3DTcrkGWxQQ/viewform", status: 'pending', score: '' },
+        { title: "TOS-BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSdt7VUFLu3hmbq4sJRg0fKwUHnn2p4v_xVitwdgnsJg4hdjCg/viewform", status: 'pending', score: '' },
+        { title: "reliability", link: "https://docs.google.com/forms/d/e/1FAIpQLSek7IbZp5bzSo7Zw7RcYTlP6VBjY22FTBOmrEV1YQ7GV5boaA/viewform", status: 'pending', score: '' },
+        { title: "glossary of terms", link: "https://docs.google.com/forms/d/e/1FAIpQLScMkNwEvu-6xhiQdSBVYONg00iVTfU3h22GAWoX32ttIn2Syw/viewform", status: 'pending', score: '' },
+        { title: "psych tests", link: "https://docs.google.com/forms/d/e/1FAIpQLScDcruqpz08UrQKYteLRJgfzgU9_oy67NTGtRB6XOqWIoNUQw/viewform", status: 'pending', score: '' },
+        { title: "psych tests", link: "https://docs.google.com/forms/d/e/1FAIpQLSf7vGA9IJAtDspaX1xyzae2lyYi1akOYCXo0l3JMLu-j4lFlA/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLScy1-rqK2aVwIraJcGE0DRzhnXWEPEy2RTTPUUGEZYGpR-V9Q/viewform", status: 'pending', score: '' },
+        { title: "practice drill (document form)", link: "https://drive.google.com/file/d/1CpEQ-0VpKZNF2yAu1Y2bcQ3BrkT_4LUz/view", status: 'pending', score: '' },
+        { title: "practice drill (document form)", link: "https://docs.google.com/document/d/19Q3lAHwGr8shYkmNAiCxY5HMz6vYlbVx/edit", status: 'pending', score: '' },
+        { title: "reliability, validity, utility", link: "https://docs.google.com/forms/d/e/1FAIpQLSethpik1TUnviYqyiWRiDP-Tl-wYgwbtackVoWddehsPp9Ubw/viewform", status: 'pending', score: '' },
+        { title: "test development", link: "https://docs.google.com/forms/d/e/1FAIpQLSc2XJv7osNjpQQhaf700O41St4KzK5CcKRjOi2BSmIki2yXKw/viewform", status: 'pending', score: '' },
+        { title: "ethics", link: "https://docs.google.com/forms/d/e/1FAIpQLSfJu_JmHL9wx4dSbKmgKw-3Ja89PInhUsyN4Hl2rd9B2wiMEA/viewform?fbzx=-4151259397222460837", status: 'pending', score: '' },
+        { title: "ethics", link: "https://docs.google.com/forms/d/e/1FAIpQLSenuZZpt_7Y7BtYd4NQR2I12nox5gClBa26MnG2iBRWFcHZKA/viewform", status: 'pending', score: '' },
+        { title: "psych tests", link: "https://docs.google.com/forms/d/e/1FAIpQLSdmX9D7r0swoLrJlHjx4YwNZa5C9EtwnwM2eGH0F6KlzBSy3w/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfJmwD92tcSFHKJEF5ut2pAHsrfCK-NTfqdj2MrBmtfmzV1Lg/viewform", status: 'pending', score: '' },
+        { title: "intelligence and testing", link: "https://docs.google.com/forms/d/e/1FAIpQLSf_a-Cc5iz6xaOZ-xbbkiGDb-MK1o_kciIIFET7pFuyjjJIDA/viewform", status: 'pending', score: '' },
+        { title: "psych tests", link: "https://docs.google.com/forms/d/e/1FAIpQLSc3UR2Q36nHmm9kRcMhTwrTk6q8Y3eBj5AKRTWkP9mFh6Hp8A/viewform", status: 'pending', score: '' },
+        { title: "psych tests", link: "https://docs.google.com/forms/d/e/1FAIpQLSc4JqTxMrl-1He7Oh1FBWLwOpuJBQb0RTwZ_V-KPOlT_ZTetw/viewform", status: 'pending', score: '' },
+        { title: "statistical tests for comparing groups", link: "https://docs.google.com/forms/d/e/1FAIpQLSdMPIYkVPl61bAxGpLHAOlp2m3Gi-kR7LuBY31bvQlQmCnVCg/viewform", status: 'pending', score: '' },
+        { title: "psych tests - CMO", link: "https://docs.google.com/forms/d/e/1FAIpQLSeKKnsR4paoMjedF_idOJk9obbMEhIYjPGSx39gubMfEKDYww/viewform", status: 'pending', score: '' },
+        { title: "psych tests - practice drill", link: "https://docs.google.com/forms/d/e/1FAIpQLSduPidSykSfcdDPPHWuFx1dW03zp8m5tBOwib3lrlWDc7-PTQ/viewform", status: 'pending', score: '' },
+        { title: "ethics (PAP)", link: "https://docs.google.com/forms/d/e/1FAIpQLSedQRLH_pTPSs92ww6sWxyzrEFW3vcXEaTjzcw3xv1qIWxaRQ/viewform", status: 'pending', score: '' },
+        { title: "intro. to testing and assessment", link: "https://highered.mheducation.com/sites/0767421574/student_view0/chapter1/multiple_choice_quiz.html", status: 'pending', score: '' },
+        { title: "validity", link: "https://docs.google.com/forms/d/e/1FAIpQLSdwMnXRNezwcjs9XWq3Cb5RDqUwKDgPm8WcgdsvIGQd4lER3w/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfvAL1PtLZ8DzK9WDJR5HofRFBiqSRsc39WCFUaLSFC_P88Pg/viewform", status: 'pending', score: '' },
+        { title: "basics of testing and assessment", link: "https://docs.google.com/forms/d/e/1FAIpQLSdpMgJ2YXNgRV6g4DUHteHK2VKymxzwsUpZRfU-SJ97KuGLlg/viewform", status: 'pending', score: '' },
+        { title: "psych tests", link: "https://docs.google.com/forms/d/e/1FAIpQLSePgVsl6um8XdCZICzXiSU9Khh4v1OTaMtjqWq1_e2ZhtHiwg/viewform", status: 'pending', score: '' },
+        { title: "psych tests - CMO", link: "https://docs.google.com/forms/d/e/1FAIpQLScLctHoRdmXUiQ3lJknUKNtmF-Ox1h3d8P3cmDSnSCMlEOvRA/viewform", status: 'pending', score: '' },
+        { title: "testing & individual differences", link: "https://docs.google.com/forms/d/e/1FAIpQLSfc3W5nzOjX02vBoLYtAAzkpSsymBv0hUTuS1q-0zS-r803Vw/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLScy1-rqK2aVwIraJcGE0DRzhnXWEPEy2RTTPUUGEZYGpR-V9Q/viewform", status: 'pending', score: '' },
+        { title: "psych tests", link: "https://docs.google.com/forms/d/e/1FAIpQLSdWYgd5uLjjogtjdY8fTS3k01ZBRTUJnu8XE6ejQb_T35e0kg/viewform", status: 'pending', score: '' },
+        { title: "tos-based", link: "https://docs.google.com/forms/d/e/1FAIpQLScdjvM1pgsgEFQp2sW1Qf1iUBMo67vun-QjH_Z4wMzsxJBmfA/viewform", status: 'pending', score: '' }
+      ],
+      iopsych: [
+        { title: "TOS C - DRILLS", link: "https://x.com/hannadiariess/status/1793906977464369181", status: 'pending', score: '' },
+        { title: "I/O TOS Based Drill", link: "https://twitter.com/ClutteredM19299/status/1762482502646567371", status: 'pending', score: '' },
+        { title: "I/O Drills", link: "https://twitter.com/nstudyingpsych/status/1673919153143689218", status: 'pending', score: '' },
+        { title: "IO TOS BASED - DRILL", link: "https://x.com/katierpm2024/status/1780793358593782123", status: 'pending', score: '' },
+        { title: "IO DRILL", link: "https://x.com/KimchiRPm2024/status/1796186292163670131V", status: 'pending', score: '' },
+        { title: "IO Practice Drill", link: "https://x.com/KimchiRPm2024/status/1796005878841082041", status: 'pending', score: '' },
+        { title: "IOPSY TOS Based Drills - ca", link: "https://x.com/katierpm2024/status/1798901869194207526", status: 'pending', score: '' },
+        { title: "TOS A - DRILLS", link: "https://x.com/stanfordbeinet5/status/1797649995002524116", status: 'pending', score: '' },
+        { title: "I/O Practice Quiz", link: "https://x.com/studywhanaya/status/1801578636933476595", status: 'pending', score: '' },
+        { title: "IOPSY Test Knowledge", link: "https://x.com/storm_rpm24/status/1802295743577002123", status: 'pending', score: '' },
+        { title: "TOS D", link: "https://x.com/storm_rpm24/status/1802000885851328866", status: 'pending', score: '' },
+        { title: "IOPSY - TOS Based - ca", link: "https://x.com/katierpm2024/status/1798901869194207526", status: 'pending', score: '' },
+        { title: "TOS D & E", link: "https://x.com/Angeee_licaaaaa/status/1691044021786091522", status: 'pending', score: '' },
+        { title: "HR Theories (Hens)", link: "https://x.com/relenthensley/status/1703740601773257168", status: 'pending', score: '' },
+        { title: "IOPSY Drill", link: "https://x.com/naya_rpm_/status/1806316427198222358", status: 'pending', score: '' },
+        { title: "I/O Drill I", link: "https://t.co/Gubdg5mHm6", status: 'pending', score: '' },
+        { title: "I/O Drill II", link: "https://t.co/33KOBCJ72p", status: 'pending', score: '' },
+        { title: "I/O Psy Drill", link: "https://t.co/isvjuNhQWf", status: 'pending', score: '' },
+        { title: "TOS BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSdgvV76HHkEIuuKVj1Qvkgew4Qz7fjhKs_H3pwGJpfMiecKvQ/viewform", status: 'pending', score: '' },
+        { title: "TOS BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSeyTxqnoNNeJCa4VWJ5OTwxql80fsscFcp1I5Rc9rvUXnU7mA/viewform", status: 'pending', score: '' },
+        { title: "10 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScV0RoeqLqs6GItTSzfUXbLnaBsCSc2f0XMeBSS-G-oi-wUSw/viewform", status: 'pending', score: '' },
+        { title: "30 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSdA02luNtDcGIdSz71fbqcX83OYpsOP0EoRn88uDbZL5HgtRg/viewform", status: 'pending', score: '' },
+        { title: "Topic A & B", link: "https://docs.google.com/forms/d/e/1FAIpQLScOl1nCbg8KecM7REzbGm8fay7Mi3nl93G5jVgEdQnJy8TEOw/viewform", status: 'pending', score: '' },
+        { title: "Topic C", link: "https://docs.google.com/forms/d/e/1FAIpQLSeE4y02NXWiVLG2wnh5OTt32irA8WFlzobWrjemfPj2f4n2dA/viewform", status: 'pending', score: '' },
+        { title: "New TOS", link: "https://docs.google.com/forms/d/e/1FAIpQLSfVvZTL72SW66xIhTwpCihxupzEmwGFvjAh1iPTdn5uruMAIg/viewform", status: 'pending', score: '' },
+        { title: "Topic D & E", link: "https://docs.google.com/forms/d/e/1FAIpQLSdL-JcypbuQa1Otl8VzSHTVIcjmerZ7hY2KFziUBzbqnAHe5g/viewform", status: 'pending', score: '' },
+        { title: "50 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScg_TwMtJ8GdD2aKElR2x38u54_m_EVmE4p8e4gLo4NV0Ok9g/viewform", status: 'pending', score: '' },
+        { title: "Dessler Test Banks (Chapter 1-14)", link: "https://drive.google.com/drive/folders/16R2Fy-dxetxoc2VgiLEl2FeZGTE4kbWW", status: 'pending', score: '' },
+        { title: "Tos B (org structure & systems)", link: "https://docs.google.com/forms/d/e/1FAIpQLScZkQGnF8ow9mTXel3N9hLoGmxhGg4EFMSBcenUvSMQGpEkLw/viewform", status: 'pending', score: '' },
+        { title: "Tos C (hrm & hrd)", link: "https://docs.google.com/forms/d/e/1FAIpQLSdE2Kt0IrzYiNKFrjWgBGleW3Mk6Xd6KMnUEMJSUMldp6kxGA/viewform", status: 'pending', score: '' },
+        { title: "Chapters 1-15", link: "https://drive.google.com/drive/folders/1iXQuOX8rOXjcorszjx2QbUVYUHzhphRj", status: 'pending', score: '' },
+        { title: "TOS BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSeZKVM3As_GAk_fI0NE7RmiY2hdMs_KeG2eoedAvVXHK2G2pw/viewform", status: 'pending', score: '' },
+        { title: "30 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScGfS3N-f5WueRVE4835AszYY8-9VQAci9u9StRyrcEZpslIw/viewform", status: 'pending', score: '' },
+        { title: "10 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSfJT9aroOCzjTJfckluzhzA8MobT91OhLUxgDVxv4AISi5XZw/viewform", status: 'pending', score: '' },
+        { title: "Organizational Theories Drill", link: "https://docs.google.com/forms/d/e/1FAIpQLSeqB9N7eJMGjmia8TpI3LWtv7_XWZdVQ1YLAWktvMKvfrh3Ow/viewform", status: 'pending', score: '' },
+        { title: "Team Dynamics", link: "https://docs.google.com/forms/d/e/1FAIpQLSecxN-G726_LfsfzP910HTxCkvfTQeADhl1GDzYHzeUzUXpNw/viewform", status: 'pending', score: '' },
+        { title: "Line and Staff Function", link: "https://docs.google.com/forms/d/e/1FAIpQLSec-ldXxoSnO-A4ePi_Pm0iMz_oIzzGALxzeAe22vrMTc6fsg/viewform", status: 'pending', score: '' },
+        { title: "25 Items", link: "https://docs.google.com/forms/d/1cWrWMjI--h2rKQ97RunotWOzInSzI0A_lOyUcpVdjoo/viewform?edit_requested=true", status: 'pending', score: '' },
+        { title: "20 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLSdH3DaMT7IU3HxHhw4USM3uJswcKIGfPcKz_q82f6OImuLplA/viewform", status: 'pending', score: '' },
+        { title: "Dessler Test Banks (1-14)", link: "https://drive.google.com/drive/folders/16R2Fy-dxetxoc2VgiLEl2FeZGTE4kbWW", status: 'pending', score: '' },
+        { title: "organizational theories", link: "https://docs.google.com/forms/d/e/1FAIpQLScgkNxfm55B9PLGEp3POfepEkn2iglGKM_5t64rtIywoFXc6w/viewform", status: 'pending', score: '' },
+        { title: "Drill - 1 (Organizational Theories Pt. 1)", link: "https://docs.google.com/forms/d/e/1FAIpQLSdIG4bSjsu7F347Q-Cy2rOq_3Xaybz95cXmC0fJKvt6nJMIsw/viewform", status: 'pending', score: '' },
+        { title: "I/O 1", link: "https://docs.google.com/forms/d/e/1FAIpQLSfiiIt7PdJfcQSKfAnnZpOoFfEeYR5mPZm0Qww14Ud42BgJyQ/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLScryQ9OcNwI64CKgWLh7u-UlThHdbTwN4giVE-FiyytDhCNEQ/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfGzK-zDqK0pC8E61XXPxSwDRQc3ADU9oQ0WyVSQdL94I6_xw/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfSlal5vQxuo71wcqZxVfPPJqEEeCcShwYnuLGx4MQ2EDTwBw/viewform", status: 'pending', score: '' },
+        { title: "TOS A", link: "https://docs.google.com/forms/d/e/1FAIpQLSdjq28rdHz0wLCSPmw360ia_3rzN7RC1ml1UBAYCKacvC31hg/viewform", status: 'pending', score: '' },
+        { title: "TOS B", link: "https://docs.google.com/forms/d/e/1FAIpQLSeyxXSmhLPXCTvxvbvqOWN9mw-8ia7Gjq80YU4e5eHQsH_NAQ/viewform", status: 'pending', score: '' },
+        { title: "TOS C", link: "https://docs.google.com/forms/d/e/1FAIpQLSdROimQ4Z8d0uErn6L7h4WyP2HmXS80k7RbDROfp1DxEnFoaA/viewform", status: 'pending', score: '' },
+        { title: "TOS D", link: "https://docs.google.com/forms/d/e/1FAIpQLSegO5-HWfy8bTkme8wwg-EQvypn5VdUy4LXWyr4hoiydd-8Lw/viewform", status: 'pending', score: '' },
+        { title: "TOS E", link: "https://docs.google.com/forms/d/e/1FAIpQLSfRL2nhfCHktfimK2SgglN9Rh3kidAROm8c2rOs-L4tHkzmzw/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfXY2Q37aBX9hHJ8PXv-Nom_5z7KW_RbfQAyrjt-xDWfH0Pxg/viewform", status: 'pending', score: '' },
+        { title: "TOS C / hrd & hrm", link: "https://docs.google.com/forms/d/e/1FAIpQLSf9eMnKs18KiJD3z4JhoWNMSzBZjs_rwUNf6F-Wv9wffZ59ew/viewform", status: 'pending', score: '' },
+        { title: "TOS A / organizational theories", link: "https://docs.google.com/forms/d/e/1FAIpQLSdTVi6o1qzBJSWcTg8YOqAH98DtV6AZQF117S3-Gmz-NwB3Mw/viewform", status: 'pending', score: '' },
+        { title: "io psych theories", link: "https://docs.google.com/forms/d/e/1FAIpQLSelrk5ZuHZJicjOAlKtSz1HV7SVbT1H73ZhXMWZqVpaGiZFGw/viewform", status: 'pending', score: '' },
+        { title: "TOS A & B", link: "https://docs.google.com/forms/d/e/1FAIpQLScOl1nCbg8KecM7REzbGm8fay7Mi3nl93G5jVgEdQnJy8TEOw/viewform", status: 'pending', score: '' },
+        { title: "TOS-BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSdp7mZgTmjHfcY3oMbVhaVPMSKdH-4fDE6GRjnhhza_Twijsw/viewform", status: 'pending', score: '' },
+        { title: "organizational theories", link: "https://docs.google.com/forms/d/e/1FAIpQLSeqB9N7eJMGjmia8TpI3LWtv7_XWZdVQ1YLAWktvMKvfrh3Ow/viewform", status: 'pending', score: '' },
+        { title: "TOS B / organizational structures & systems", link: "https://docs.google.com/forms/d/e/1FAIpQLScZkQGnF8ow9mTXel3N9hLoGmxhGg4EFMSBcenUvSMQGpEkLw/viewform", status: 'pending', score: '' },
+        { title: "TOS D & E", link: "https://docs.google.com/forms/d/e/1FAIpQLSdL-JcypbuQa1Otl8VzSHTVIcjmerZ7hY2KFziUBzbqnAHe5g/viewform", status: 'pending', score: '' },
+        { title: "practice test", link: "https://docs.google.com/forms/d/e/1FAIpQLSfLlFWp0vf6E56ictbf0kmxgYuTj6oZTCZUIGXhdVx6WzQz6g/viewform", status: 'pending', score: '' },
+        { title: "RIASEC", link: "https://docs.google.com/forms/d/e/1FAIpQLSfqOVzX9acdY_xL_sb77TUVaJ8zXOaXkLDy-ly8LEdlXWQpwQ/viewform", status: 'pending', score: '' },
+        { title: "organizational structures", link: "https://docs.google.com/forms/d/e/1FAIpQLSdSGizfWnBoJariJozyUddiupxtHNqci88MG0NjR5BeCfGiJg/viewform", status: 'pending', score: '' },
+        { title: "basics", link: "https://docs.google.com/forms/d/e/1FAIpQLSdBr2Wz5-zfOOdpOjXR92yMCFdMnVD-HsUQElmlqtcpCEkamg/viewform", status: 'pending', score: '' },
+        { title: "TOS-BASED", link: "https://docs.google.com/forms/d/e/1FAIpQLSeZKVM3As_GAk_fI0NE7RmiY2hdMs_KeG2eoedAvVXHK2G2pw/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLSdgvV76HHkEIuuKVj1Qvkgew4Qz7fjhKs_H3pwGJpfMiecKvQ/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLSdgvV76HHkEIuuKVj1Qvkgew4Qz7fjhKs_H3pwGJpfMiecKvQ/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLSeyTxqnoNNeJCa4VWJ5OTwxql80fsscFcp1I5Rc9rvUXnU7mA/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLSeyTxqnoNNeJCa4VWJ5OTwxql80fsscFcp1I5Rc9rvUXnU7mA/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLScV0RoeqLqs6GItTSzfUXbLnaBsCSc2f0XMeBSS-G-oi-wUSw/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLScV0RoeqLqs6GItTSzfUXbLnaBsCSc2f0XMeBSS-G-oi-wUSw/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLSdA02luNtDcGIdSz71fbqcX83OYpsOP0EoRn88uDbZL5HgtRg/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLSdA02luNtDcGIdSz71fbqcX83OYpsOP0EoRn88uDbZL5HgtRg/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLScOl1nCbg8KecM7REzbGm8fay7Mi3nl93G5jVgEdQnJy8TEOw/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLScOl1nCbg8KecM7REzbGm8fay7Mi3nl93G5jVgEdQnJy8TEOw/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLSeE4y02NXWiVLG2wnh5OTt32irA8WFlzobWrjemfPj2f4n2dA/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLSeE4y02NXWiVLG2wnh5OTt32irA8WFlzobWrjemfPj2f4n2dA/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLSdL-JcypbuQa1Otl8VzSHTVIcjmerZ7hY2KFziUBzbqnAHe5g/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLSdL-JcypbuQa1Otl8VzSHTVIcjmerZ7hY2KFziUBzbqnAHe5g/viewform", status: 'pending', score: '' },
+        { title: "https://docs.google.com/forms/d/e/1FAIpQLScg_TwMtJ8GdD2aKElR2x38u54_m_EVmE4p8e4gLo4NV0Ok9g/viewform", link: "https://docs.google.com/forms/d/e/1FAIpQLScg_TwMtJ8GdD2aKElR2x38u54_m_EVmE4p8e4gLo4NV0Ok9g/viewform", status: 'pending', score: '' },
+        { title: "https://drive.google.com/drive/folders/16R2Fy-dxetxoc2VgiLEl2FeZGTE4kbWW", link: "https://drive.google.com/drive/folders/16R2Fy-dxetxoc2VgiLEl2FeZGTE4kbWW", status: 'pending', score: '' },
+        { title: "30 Items", link: "https://docs.google.com/forms/d/e/1FAIpQLScGfS3N-f5WueRVE4835AszYY8-9VQAci9u9StRyrcEZpslIw/viewform", status: 'pending', score: '' }
+      ]
+    };
+    
+    // New features data structures
+    d.todos = [];
+    d.calendar = {};
+    d.studyHours = {};
+    d.habits = [];
+    d.mood = {};
+    d.theme = 'lilac-dream';
+    
+    return d;
+  }
+
+  function pct(done, total) {
+    if (!total) return 0;
+    return Math.min(100, Math.round((done / total) * 100));
+  }
+
+  function overallPct(data) {
+    let done = 0, total = 0;
+    SUBJECTS.forEach(s => { done += (data[s.id]?.done || 0); total += (data[s.id]?.total || 100); });
+    return pct(done, total);
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function renderApp(data) {
+    const days  = daysUntil();
+    const total = overallPct(data);
+
+    document.getElementById("days-count").textContent = days;
+    document.getElementById("overall-pct").textContent = total + "%";
+    document.getElementById("overall-bar-fill").style.width = total + "%";
+    document.getElementById("user-name").textContent = data.name || (currentUser?.displayName) || "Scholar";
+    document.getElementById("quote-text").textContent  = data.quote  || "You are so close. Keep going 🍓";
+
+    SUBJECTS.forEach(s => {
+      const d   = data[s.id] || { done: 0, total: 100 };
+      const p   = pct(d.done, d.total);
+      const bar = document.getElementById(`bar-${s.id}`);
+      const lbl = document.getElementById(`lbl-${s.id}`);
+      const inp = document.getElementById(`done-${s.id}`);
+      const tot = document.getElementById(`total-${s.id}`);
+      if (bar) bar.style.width = p + "%";
+      if (lbl) lbl.textContent = p + "%";
+      if (inp) inp.value = d.done;
+      if (tot) tot.value = d.total;
+    });
+  }
+
+  // ── Firestore sync ───────────────────────────────────────────────────────
+  function subscribeToData(uid) {
+    if (unsubSnapshot) unsubSnapshot();
+    const ref = doc(db, "trackers", uid);
+    unsubSnapshot = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        trackerData = snap.data();
+      } else {
+        trackerData = defaultData();
+        setDoc(ref, trackerData);
+      }
+      renderApp(trackerData);
+    });
+  }
+
+  async function saveData() {
+    if (!currentUser) return;
+    await setDoc(doc(db, "trackers", currentUser.uid), trackerData);
+    showToast("Saved ✓");
+  }
+
+  // ── Auth state ────────────────────────────────────────────────────────────
+  onAuthStateChanged(auth, user => {
+    currentUser = user;
+    if (user) {
+      showScreen("app");
+      subscribeToData(user.uid);
+    } else {
+      showScreen("auth");
+      if (unsubSnapshot) { unsubSnapshot(); unsubSnapshot = null; }
+    }
+  });
+
+  // ── Screen helpers ────────────────────────────────────────────────────────
+  function showScreen(name) {
+    ["auth", "app"].forEach(s => {
+      document.getElementById(`screen-${s}`).style.display = (s === name) ? "flex" : "none";
+    });
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2500);
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.style.display = "block"; }
+  }
+  function clearErrors() {
+    document.querySelectorAll(".err").forEach(e => { e.textContent = ""; e.style.display = "none"; });
+  }
+
+  // ── Expose to window ──────────────────────────────────────────────────────
+  window._rpm = {
+    async login() {
+      clearErrors();
+      const email = document.getElementById("login-email").value.trim();
+      const pass  = document.getElementById("login-pass").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (e) {
+        showError("login-err", friendlyError(e.code));
+      }
+    },
+    async signup() {
+      clearErrors();
+      const name  = document.getElementById("signup-name").value.trim();
+      const email = document.getElementById("signup-email").value.trim();
+      const pass  = document.getElementById("signup-pass").value;
+      const pass2 = document.getElementById("signup-pass2").value;
+      if (pass !== pass2) return showError("signup-err", "Passwords don't match 💔");
+      if (pass.length < 6) return showError("signup-err", "Password must be at least 6 characters.");
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await updateProfile(cred.user, { displayName: name });
+        const init = { ...defaultData(), name };
+        await setDoc(doc(db, "trackers", cred.user.uid), init);
+      } catch (e) {
+        showError("signup-err", friendlyError(e.code));
+      }
+    },
+    logout() {
+      signOut(auth);
+    },
+    updateSubject(id) {
+      const done  = parseInt(document.getElementById(`done-${id}`).value)  || 0;
+      const total = parseInt(document.getElementById(`total-${id}`).value) || 100;
+      trackerData[id] = { done, total };
+      renderApp(trackerData);
+    },
+    updateMeta() {
+      trackerData.name  = document.getElementById("edit-name").value.trim()  || trackerData.name;
+      trackerData.quote = document.getElementById("edit-quote").value.trim() || trackerData.quote;
+      renderApp(trackerData);
+    },
+    save: saveData,
+    toggleEdit() {
+      const panel = document.getElementById("edit-panel");
+      const isHidden = panel.style.display === "none" || !panel.style.display;
+      panel.style.display = isHidden ? "block" : "none";
+      if (isHidden) {
+        document.getElementById("edit-name").value  = trackerData.name  || "";
+        document.getElementById("edit-quote").value = trackerData.quote || "";
+      }
+    },
+    switchTab(tab) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add("active");
+      document.getElementById(`tab-${tab}`).classList.add("active");
+      if (tab === 'tos') renderTOS();
+      if (tab === 'masterlist') renderMasterlist();
+      if (tab === 'drills') renderDrills();
+      if (tab === 'todos') renderTodos();
+      if (tab === 'calendar') renderCalendar();
+      if (tab === 'study') renderStudyHours();
+      if (tab === 'habits') renderHabits();
+      if (tab === 'mood') renderMood();
+    },
+    showAuthTab(tab) {
+      ["login","signup"].forEach(t => {
+        document.getElementById(`auth-${t}`).style.display = (t === tab) ? "flex" : "none";
+        document.querySelector(`[data-authtab="${t}"]`).classList.toggle("active", t === tab);
+      });
+    }
+  };
+
+  function friendlyError(code) {
+    const map = {
+      "auth/invalid-email": "Hmm, that email doesn't look right.",
+      "auth/user-not-found": "No account found with that email.",
+      "auth/wrong-password": "Wrong password. Try again 🍵",
+      "auth/email-already-in-use": "That email is already registered!",
+      "auth/weak-password": "Password is too weak (min 6 chars).",
+      "auth/invalid-credential": "Email or password is incorrect.",
+      "auth/network-request-failed": "Network error. Check your connection.",
+    };
+    return map[code] || "Something went wrong. Please try again.";
+  }
+
+  // ── TOS Functions ───────────────────────────────────────────────────────────
+  function renderTOS() {
+    const container = document.getElementById('tos-container');
+    if (!container) return;
+
+    let html = '';
+    Object.keys(TOS_DATA).forEach(subjectId => {
+      const subject = TOS_DATA[subjectId];
+      const subjectProgress = calculateSubjectTOSProgress(subjectId);
+
+      html += `
+        <div class="tos-subject-card">
+          <div class="tos-subject-header" onclick="window._rpm.toggleTOSSubject('${subjectId}')">
+            <div class="tos-subject-info">
+              <span class="tos-subject-icon">${subject.emoji}</span>
+              <span class="tos-subject-name">${subject.name}</span>
+            </div>
+            <div class="tos-subject-progress">
+              <div class="tos-progress-bar">
+                <div class="tos-progress-fill" style="width: ${subjectProgress}%"></div>
+              </div>
+              <span class="tos-progress-text">${subjectProgress}%</span>
+              <span class="tos-chevron">▼</span>
+            </div>
+          </div>
+          <div class="tos-sections" id="tos-sections-${subjectId}">
+            ${subject.sections.map((section, sIdx) => {
+              const sectionProgress = calculateSectionProgress(subjectId, sIdx);
+              return `
+                <div class="tos-section">
+                  <div class="tos-section-header" onclick="window._rpm.toggleTOSSection('${subjectId}', ${sIdx})">
+                    <span class="tos-section-title">${section.title}</span>
+                    <div class="tos-section-progress">
+                      <span class="tos-section-text">${sectionProgress}%</span>
+                      <span class="tos-chevron-small">▼</span>
+                    </div>
+                  </div>
+                  <div class="tos-topics" id="tos-topics-${subjectId}-${sIdx}">
+                    ${section.topics.map(topic => {
+                      const isChecked = trackerData.tos?.[subjectId]?.[topic.id] ? 'checked' : '';
+                      return `
+                        <div class="tos-topic">
+                          <input type="checkbox" id="topic-${topic.id}" ${isChecked} onchange="window._rpm.toggleTOSTopic('${subjectId}', '${topic.id}')">
+                          <label for="topic-${topic.id}">${topic.text}</label>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  function calculateSubjectTOSProgress(subjectId) {
+    if (!trackerData.tos || !trackerData.tos[subjectId]) return 0;
+    const subject = TOS_DATA[subjectId];
+    let total = 0;
+    let done = 0;
+    subject.sections.forEach(section => {
+      section.topics.forEach(topic => {
+        total++;
+        if (trackerData.tos[subjectId][topic.id]) done++;
+      });
+    });
+    return total === 0 ? 0 : Math.round((done / total) * 100);
+  }
+
+  function calculateSectionProgress(subjectId, sectionIdx) {
+    if (!trackerData.tos || !trackerData.tos[subjectId]) return 0;
+    const section = TOS_DATA[subjectId].sections[sectionIdx];
+    let total = section.topics.length;
+    let done = 0;
+    section.topics.forEach(topic => {
+      if (trackerData.tos[subjectId][topic.id]) done++;
+    });
+    return total === 0 ? 0 : Math.round((done / total) * 100);
+  }
+
+  window._rpm.toggleTOSSubject = function(subjectId) {
+    const sections = document.getElementById(`tos-sections-${subjectId}`);
+    const chevron = sections.previousElementSibling.querySelector('.tos-chevron');
+    if (sections.style.display === 'none') {
+      sections.style.display = 'block';
+      chevron.style.transform = 'rotate(0deg)';
+    } else {
+      sections.style.display = 'none';
+      chevron.style.transform = 'rotate(-90deg)';
+    }
+  };
+
+  window._rpm.toggleTOSSection = function(subjectId, sectionIdx) {
+    const topics = document.getElementById(`tos-topics-${subjectId}-${sectionIdx}`);
+    const chevron = topics.previousElementSibling.querySelector('.tos-chevron-small');
+    if (topics.style.display === 'none') {
+      topics.style.display = 'block';
+      chevron.style.transform = 'rotate(0deg)';
+    } else {
+      topics.style.display = 'none';
+      chevron.style.transform = 'rotate(-90deg)';
+    }
+  };
+
+  window._rpm.toggleTOSTopic = function(subjectId, topicId) {
+    if (!trackerData.tos) trackerData.tos = {};
+    if (!trackerData.tos[subjectId]) trackerData.tos[subjectId] = {};
+    trackerData.tos[subjectId][topicId] = !trackerData.tos[subjectId][topicId];
+    renderTOS();
+  };
+
+  // ── Drills Functions ───────────────────────────────────────────────────────
+  function renderDrills() {
+    const container = document.getElementById('drills-container');
+    if (!container) return;
+
+    let html = '';
+    SUBJECTS.forEach(subject => {
+      const scores = trackerData.scores?.[subject.id] || [];
+      const average = calculateAverage(subject.id);
+
+      html += `
+        <div class="drills-subject-card">
+          <div class="drills-subject-header">
+            <div class="drills-subject-info">
+              <span class="drills-subject-icon">${subject.emoji}</span>
+              <span class="drills-subject-name">${subject.label}</span>
+            </div>
+            <div class="drills-subject-average">
+              <span class="drills-average-label">Average:</span>
+              <span class="drills-average-value">${average}%</span>
+            </div>
+          </div>
+          <div class="drills-table-container">
+            <table class="drills-table">
+              <thead>
+                <tr>
+                  <th>Drills</th>
+                  <th>Date</th>
+                  <th>Score</th>
+                  <th>Mistakes</th>
+                  <th>Total</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${scores.map((score, idx) => `
+                  <tr>
+                    <td><input type="text" class="drills-input" value="${score.drill || ''}" onchange="window._rpm.updateDrill('${subject.id}', ${idx}, 'drill', this.value)"></td>
+                    <td><input type="date" class="drills-input" value="${score.date || ''}" onchange="window._rpm.updateDrill('${subject.id}', ${idx}, 'date', this.value)"></td>
+                    <td><input type="number" class="drills-input" value="${score.score || ''}" min="0" onchange="window._rpm.updateDrill('${subject.id}', ${idx}, 'score', this.value)"></td>
+                    <td><input type="number" class="drills-input" value="${score.mistakes || ''}" min="0" onchange="window._rpm.updateDrill('${subject.id}', ${idx}, 'mistakes', this.value)"></td>
+                    <td><input type="number" class="drills-input" value="${score.total || ''}" min="1" onchange="window._rpm.updateDrill('${subject.id}', ${idx}, 'total', this.value)"></td>
+                    <td><button class="drills-delete-btn" onclick="window._rpm.deleteDrill('${subject.id}', ${idx})">🗑️</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <button class="drills-add-btn" onclick="window._rpm.addDrill('${subject.id}')">+ Add Drill</button>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  function calculateAverage(subjectId) {
+    const scores = trackerData.scores?.[subjectId] || [];
+    if (scores.length === 0) return 0;
+    let totalPercent = 0;
+    let count = 0;
+    scores.forEach(score => {
+      if (score.total && score.score !== undefined && score.score !== '') {
+        totalPercent += (score.score / score.total) * 100;
+        count++;
+      }
+    });
+    return count === 0 ? 0 : Math.round(totalPercent / count);
+  }
+
+  window._rpm.addDrill = function(subjectId) {
+    if (!trackerData.scores) trackerData.scores = {};
+    if (!trackerData.scores[subjectId]) trackerData.scores[subjectId] = [];
+    trackerData.scores[subjectId].push({
+      drill: '',
+      date: new Date().toISOString().split('T')[0],
+      score: '',
+      mistakes: '',
+      total: ''
+    });
+    renderDrills();
+  };
+
+  window._rpm.updateDrill = function(subjectId, idx, field, value) {
+    if (!trackerData.scores) trackerData.scores = {};
+    if (!trackerData.scores[subjectId]) trackerData.scores[subjectId] = [];
+    trackerData.scores[subjectId][idx][field] = value;
+    renderDrills();
+  };
+
+  window._rpm.deleteDrill = function(subjectId, idx) {
+    if (!trackerData.scores) trackerData.scores = {};
+    if (!trackerData.scores[subjectId]) trackerData.scores[subjectId] = [];
+    trackerData.scores[subjectId].splice(idx, 1);
+    renderDrills();
+  };
+
+  // ── Masterlist Functions ───────────────────────────────────────────────────
+  function renderMasterlist() {
+    const container = document.getElementById('masterlist-container');
+    if (!container) return;
+
+    let html = '';
+    SUBJECTS.forEach(subject => {
+      const items = trackerData.masterlist?.[subject.id] || [];
+
+      html += `
+        <div class="masterlist-subject-card">
+          <div class="masterlist-subject-header">
+            <div class="masterlist-subject-info">
+              <span class="masterlist-subject-icon">${subject.emoji}</span>
+              <span class="masterlist-subject-name">${subject.label}</span>
+            </div>
+            <button class="masterlist-add-btn" onclick="window._rpm.addMasterlistItem('${subject.id}')">+ Add Item</button>
+          </div>
+          <div class="masterlist-table-container">
+            <table class="masterlist-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Link</th>
+                  <th>Status</th>
+                  <th>Score</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${items.map((item, idx) => `
+                  <tr>
+                    <td><input type="text" class="masterlist-input" value="${item.title || ''}" placeholder="Drill title" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'title', this.value)"></td>
+                    <td><input type="url" class="masterlist-input" value="${item.link || ''}" placeholder="https://..." onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'link', this.value)"></td>
+                    <td>
+                      <select class="masterlist-select" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'status', this.value)">
+                        <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
+                        <option value="in-progress" ${item.status === 'in-progress' ? 'selected' : ''}>In Progress</option>
+                        <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>Completed</option>
+                      </select>
+                    </td>
+                    <td><input type="text" class="masterlist-input" value="${item.score || ''}" placeholder="e.g., 85%" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'score', this.value)"></td>
+                    <td><button class="masterlist-delete-btn" onclick="window._rpm.deleteMasterlistItem('${subject.id}', ${idx})">🗑️</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+  }
+
+  window._rpm.addMasterlistItem = function(subjectId) {
+    if (!trackerData.masterlist) trackerData.masterlist = {};
+    if (!trackerData.masterlist[subjectId]) trackerData.masterlist[subjectId] = [];
+    trackerData.masterlist[subjectId].push({
+      title: '',
+      link: '',
+      status: 'pending',
+      score: ''
+    });
+    renderMasterlist();
+  };
+
+  window._rpm.updateMasterlistItem = function(subjectId, idx, field, value) {
+    if (!trackerData.masterlist) trackerData.masterlist = {};
+    if (!trackerData.masterlist[subjectId]) trackerData.masterlist[subjectId] = [];
+    trackerData.masterlist[subjectId][idx][field] = value;
+    renderMasterlist();
+  };
+
+  window._rpm.deleteMasterlistItem = function(subjectId, idx) {
+    if (!trackerData.masterlist) trackerData.masterlist = {};
+    if (!trackerData.masterlist[subjectId]) trackerData.masterlist[subjectId] = [];
+    trackerData.masterlist[subjectId].splice(idx, 1);
+    renderMasterlist();
+  };
+
+  // ── To-Do Functions ─────────────────────────────────────────────────────────
+  function renderTodos() {
+    const container = document.getElementById('todos-container');
+    if (!container) return;
+    
+    const todos = trackerData.todos || [];
+    const priorityOrder = { high: 0, medium: 1, low: 2 };
+    todos.sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
+    
+    container.innerHTML = todos.map((todo, idx) => `
+      <div class="todo-item ${todo.completed ? 'completed' : ''}" data-priority="${todo.priority}">
+        <input type="checkbox" ${todo.completed ? 'checked' : ''} onchange="window._rpm.toggleTodo(${idx})">
+        <span class="todo-text">${todo.text}</span>
+        <span class="todo-priority">${todo.priority}</span>
+        <button class="todo-delete" onclick="window._rpm.deleteTodo(${idx})">🗑️</button>
+      </div>
+    `).join('');
+  }
+
+  window._rpm.addTodo = function() {
+    const input = document.getElementById('todo-input');
+    const priority = document.getElementById('todo-priority').value;
+    if (!input.value.trim()) return;
+    
+    if (!trackerData.todos) trackerData.todos = [];
+    trackerData.todos.push({
+      text: input.value.trim(),
+      completed: false,
+      priority: priority
+    });
+    input.value = '';
+    renderTodos();
+    saveData();
+  };
+
+  window._rpm.toggleTodo = function(idx) {
+    if (trackerData.todos && trackerData.todos[idx]) {
+      trackerData.todos[idx].completed = !trackerData.todos[idx].completed;
+      renderTodos();
+      saveData();
+    }
+  };
+
+  window._rpm.deleteTodo = function(idx) {
+    if (trackerData.todos) {
+      trackerData.todos.splice(idx, 1);
+      renderTodos();
+      saveData();
+    }
+  };
+
+  // ── Calendar Functions ───────────────────────────────────────────────────────
+  let currentCalendarDate = new Date();
+  
+  function renderCalendar() {
+    const container = document.getElementById('calendar-grid');
+    const monthYear = document.getElementById('calendar-month-year');
+    if (!container || !monthYear) return;
+    
+    const year = currentCalendarDate.getFullYear();
+    const month = currentCalendarDate.getMonth();
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    monthYear.textContent = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    
+    const calendar = trackerData.calendar || {};
+    
+    let html = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => 
+      `<div class="calendar-day-header">${day}</div>`
+    ).join('');
+    
+    for (let i = 0; i < firstDay; i++) {
+      html += '<div class="calendar-day empty"></div>';
+    }
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateKey = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const events = calendar[dateKey] || [];
+      const hasEvents = events.length > 0;
+      
+      html += `
+        <div class="calendar-day ${hasEvents ? 'has-events' : ''}" onclick="window._rpm.openEventModal('${dateKey}')">
+          <span class="calendar-day-number">${day}</span>
+          ${hasEvents ? `<div class="calendar-event-dots">${events.slice(0, 3).map(() => '•').join('')}</div>` : ''}
+        </div>
+      `;
+    }
+    
+    container.innerHTML = html;
+  }
+
+  window._rpm.prevMonth = function() {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    renderCalendar();
+  };
+
+  window._rpm.nextMonth = function() {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    renderCalendar();
+  };
+
+  window._rpm.openEventModal = function(dateKey) {
+    const modal = document.getElementById('event-modal');
+    const dateHeader = document.getElementById('event-date');
+    const eventsList = document.getElementById('events-list');
+    if (!modal || !dateHeader || !eventsList) return;
+    
+    const calendar = trackerData.calendar || {};
+    const events = calendar[dateKey] || [];
+    
+    dateHeader.textContent = new Date(dateKey).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    
+    eventsList.innerHTML = events.map((event, idx) => `
+      <div class="event-item">
+        <span>${event}</span>
+        <button onclick="window._rpm.deleteEvent('${dateKey}', ${idx})">🗑️</button>
+      </div>
+    `).join('');
+    
+    modal.style.display = 'flex';
+    modal.dataset.dateKey = dateKey;
+  };
+
+  window._rpm.closeEventModal = function() {
+    const modal = document.getElementById('event-modal');
+    if (modal) modal.style.display = 'none';
+  };
+
+  window._rpm.addEvent = function() {
+    const modal = document.getElementById('event-modal');
+    const input = document.getElementById('event-input');
+    if (!modal || !input || !input.value.trim()) return;
+    
+    const dateKey = modal.dataset.dateKey;
+    if (!dateKey) return;
+    
+    if (!trackerData.calendar) trackerData.calendar = {};
+    if (!trackerData.calendar[dateKey]) trackerData.calendar[dateKey] = [];
+    
+    trackerData.calendar[dateKey].push(input.value.trim());
+    input.value = '';
+    
+    renderCalendar();
+    window._rpm.openEventModal(dateKey);
+    saveData();
+  };
+
+  window._rpm.deleteEvent = function(dateKey, idx) {
+    if (trackerData.calendar && trackerData.calendar[dateKey]) {
+      trackerData.calendar[dateKey].splice(idx, 1);
+      renderCalendar();
+      window._rpm.openEventModal(dateKey);
+      saveData();
+    }
+  };
+
+  // ── Study Hours Functions ─────────────────────────────────────────────────────
+  function renderStudyHours() {
+    const container = document.getElementById('heatmap-grid');
+    if (!container) return;
+    
+    const studyHours = trackerData.studyHours || {};
+    const today = new Date();
+    const days = [];
+    
+    for (let i = 364; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      const hours = studyHours[dateKey] || 0;
+      days.push({ date: dateKey, hours });
+    }
+    
+    container.innerHTML = days.map(day => {
+      const intensity = Math.min(day.hours / 8, 1);
+      return `<div class="heatmap-cell" style="background: rgba(122, 158, 126, ${0.1 + intensity * 0.9})" title="${day.date}: ${day.hours}h"></div>`;
+    }).join('');
+    
+    document.getElementById('study-date').value = today.toISOString().split('T')[0];
+  }
+
+  window._rpm.addStudyHours = function() {
+    const dateInput = document.getElementById('study-date');
+    const hoursInput = document.getElementById('study-hours');
+    if (!dateInput || !hoursInput || !hoursInput.value) return;
+    
+    const dateKey = dateInput.value;
+    const hours = parseFloat(hoursInput.value);
+    
+    if (!trackerData.studyHours) trackerData.studyHours = {};
+    trackerData.studyHours[dateKey] = hours;
+    
+    hoursInput.value = '';
+    renderStudyHours();
+    saveData();
+  };
+
+  // ── Habits Functions ─────────────────────────────────────────────────────────
+  function renderHabits() {
+    const container = document.getElementById('habits-container');
+    if (!container) return;
+    
+    const habits = trackerData.habits || [];
+    const today = new Date().toISOString().split('T')[0];
+    
+    container.innerHTML = habits.map((habit, idx) => {
+      const isCompletedToday = habit.completedDates && habit.completedDates.includes(today);
+      return `
+        <div class="habit-item">
+          <input type="checkbox" ${isCompletedToday ? 'checked' : ''} onchange="window._rpm.toggleHabit(${idx})">
+          <span class="habit-name">${habit.name}</span>
+          <div class="habit-streak">🔥 ${habit.streak || 0} day streak</div>
+          <button class="habit-delete" onclick="window._rpm.deleteHabit(${idx})">🗑️</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window._rpm.addHabit = function() {
+    const input = document.getElementById('habit-input');
+    if (!input || !input.value.trim()) return;
+    
+    if (!trackerData.habits) trackerData.habits = [];
+    trackerData.habits.push({
+      name: input.value.trim(),
+      completedDates: [],
+      streak: 0
+    });
+    input.value = '';
+    renderHabits();
+    saveData();
+  };
+
+  window._rpm.toggleHabit = function(idx) {
+    if (!trackerData.habits || !trackerData.habits[idx]) return;
+    
+    const habit = trackerData.habits[idx];
+    const today = new Date().toISOString().split('T')[0];
+    
+    if (!habit.completedDates) habit.completedDates = [];
+    
+    const todayIdx = habit.completedDates.indexOf(today);
+    if (todayIdx > -1) {
+      habit.completedDates.splice(todayIdx, 1);
+      habit.streak = Math.max(0, habit.streak - 1);
+    } else {
+      habit.completedDates.push(today);
+      habit.streak = (habit.streak || 0) + 1;
+    }
+    
+    renderHabits();
+    saveData();
+  };
+
+  window._rpm.deleteHabit = function(idx) {
+    if (trackerData.habits) {
+      trackerData.habits.splice(idx, 1);
+      renderHabits();
+      saveData();
+    }
+  };
+
+  // ── Mood Functions ───────────────────────────────────────────────────────────
+  const motivationalQuotes = [
+    "You are so close. Keep going 🍓",
+    "Every small step counts ✨",
+    "Believe in yourself 💪",
+    "Progress, not perfection 🌱",
+    "You've got this! 🎯",
+    "One day at a time 🌸",
+    "Stay focused, stay positive 🌟",
+    "Your hard work will pay off 📚",
+    "Keep pushing forward! 🚀",
+    "You are capable of amazing things 💫"
+  ];
+
+  function renderMood() {
+    const container = document.getElementById('mood-history');
+    const quoteEl = document.getElementById('daily-quote');
+    if (!container || !quoteEl) return;
+    
+    const mood = trackerData.mood || {};
+    const today = new Date().toISOString().split('T')[0];
+    
+    document.getElementById('mood-date').value = today;
+    
+    const quoteIndex = new Date().getDate() % motivationalQuotes.length;
+    quoteEl.textContent = `"${motivationalQuotes[quoteIndex]}"`;
+    
+    const sortedDates = Object.keys(mood).sort().reverse().slice(0, 7);
+    container.innerHTML = sortedDates.map(date => `
+      <div class="mood-entry">
+        <span class="mood-date">${new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+        <span class="mood-emoji">${mood[date]}</span>
+      </div>
+    `).join('');
+  }
+
+  window._rpm.addMood = function() {
+    const dateInput = document.getElementById('mood-date');
+    const moodSelect = document.getElementById('mood-select');
+    if (!dateInput || !moodSelect) return;
+    
+    const dateKey = dateInput.value;
+    const moodValue = moodSelect.value;
+    
+    if (!trackerData.mood) trackerData.mood = {};
+    trackerData.mood[dateKey] = moodValue;
+    
+    renderMood();
+    saveData();
+  };
+
+  // ── Theme Functions ───────────────────────────────────────────────────────────
+  window._rpm.toggleTheme = function() {
+    const currentTheme = trackerData.theme || 'lilac-dream';
+    const newTheme = currentTheme === 'lilac-dream' ? 'pastel-pink' : 'lilac-dream';
+    trackerData.theme = newTheme;
+    applyTheme(newTheme);
+    saveData();
+  };
+
+  function applyTheme(theme) {
+    const root = document.documentElement;
+    if (theme === 'pastel-pink') {
+      root.style.setProperty('--cream', '#FFF0F5');
+      root.style.setProperty('--matcha', '#FFB6C1');
+      root.style.setProperty('--matcha2', '#FF69B4');
+      root.style.setProperty('--matcha3', '#DB7093');
+      root.style.setProperty('--straw', '#FF1493');
+      root.style.setProperty('--straw2', '#C71585');
+      root.style.setProperty('--straw-lt', '#FFB6C1');
+    } else {
+      root.style.setProperty('--cream', '#FDF8F3');
+      root.style.setProperty('--matcha', '#7A9E7E');
+      root.style.setProperty('--matcha2', '#5C8260');
+      root.style.setProperty('--matcha3', '#3D6642');
+      root.style.setProperty('--straw', '#E8525A');
+      root.style.setProperty('--straw2', '#C93940');
+      root.style.setProperty('--straw-lt', '#FFD6D8');
+    }
+  }
+
+  // Initialize theme on load
+  if (trackerData.theme) {
+    applyTheme(trackerData.theme);
+  }
+</script>
+
+<style>
+  :root {
+    --cream:   #FDF8F3;
+    --matcha:  #7A9E7E;
+    --matcha2: #5C8260;
+    --matcha3: #3D6642;
+    --straw:   #E8525A;
+    --straw2:  #C93940;
+    --straw-lt:#FFD6D8;
+    --straw-pale:#FFF0F0;
+    --pink:    #F5A0A4;
+    --sage:    #C8DEC8;
+    --sage-lt: #EBF4EB;
+    --text:    #3A2E2E;
+    --text2:   #7A6060;
+    --border:  #E8D8D0;
+    --shadow:  rgba(122,158,126,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Decorative background ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 700px 500px at 10% 20%, rgba(200,222,200,0.35) 0%, transparent 70%),
+      radial-gradient(ellipse 500px 400px at 90% 80%, rgba(232,82,90,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 300px 300px at 60% 10%, rgba(245,160,164,0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Floating deco ── */
+  .deco {
+    position: fixed; pointer-events: none; z-index: 0; opacity: 0.18;
+    font-size: 3rem; user-select: none;
+  }
+  .deco-1 { top: 5%;  left: 3%;  animation: float1 8s ease-in-out infinite; }
+  .deco-2 { top: 15%; right: 6%; font-size: 2rem; animation: float2 10s ease-in-out infinite; }
+  .deco-3 { bottom: 20%; left: 5%; font-size: 2.5rem; animation: float1 12s ease-in-out infinite; }
+  .deco-4 { bottom: 10%; right: 4%; animation: float2 9s ease-in-out infinite; }
+  .deco-5 { top: 50%; left: 50%; font-size: 8rem; opacity: 0.04; animation: spin 30s linear infinite; }
+
+  @keyframes float1 { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-20px) rotate(5deg)} }
+  @keyframes float2 { 0%,100%{transform:translateY(0) rotate(8deg)} 50%{transform:translateY(-15px) rotate(-3deg)} }
+  @keyframes spin    { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+  /* ── Screens ── */
+  #screen-auth, #screen-app { display: none; }
+  #screen-auth {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem 1rem;
+    position: relative; z-index: 1;
+  }
+
+  /* ── Auth card ── */
+  .auth-card {
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(12px);
+    border: 1.5px solid var(--border);
+    border-radius: 2rem;
+    padding: 2.5rem 2.5rem 2rem;
+    width: 100%; max-width: 420px;
+    box-shadow: 0 20px 60px var(--shadow), 0 4px 20px rgba(200,57,64,0.08);
+  }
+
+  .auth-logo {
+    text-align: center;
+    margin-bottom: 1.8rem;
+  }
+  .auth-logo h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    color: var(--matcha3);
+  }
+  .auth-logo p {
+    font-family: 'Caveat', cursive;
+    font-size: 1.1rem;
+    color: var(--straw);
+    margin-top: .2rem;
+  }
+  .auth-logo .icon-row {
+    font-size: 2.5rem;
+    margin-bottom: .5rem;
+    letter-spacing: .3rem;
+  }
+
+  .auth-tabs {
+    display: flex; gap: .5rem;
+    margin-bottom: 1.5rem;
+    background: var(--sage-lt);
+    border-radius: 1rem;
+    padding: .3rem;
+  }
+  .auth-tab-btn {
+    flex: 1; padding: .55rem;
+    border: none; background: transparent;
+    border-radius: .75rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem; font-weight: 500;
+    color: var(--text2); cursor: pointer;
+    transition: all .25s;
+  }
+  .auth-tab-btn.active {
+    background: white;
+    color: var(--matcha3);
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+
+  .auth-form {
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .form-group { display: flex; flex-direction: column; gap: .35rem; }
+  .form-group label {
+    font-size: .8rem; font-weight: 500;
+    color: var(--text2); letter-spacing: .05em; text-transform: uppercase;
+  }
+  .form-group input {
+    padding: .75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem; color: var(--text);
+    background: white;
+    transition: border-color .2s, box-shadow .2s;
+    outline: none;
+  }
+  .form-group input:focus {
+    border-color: var(--matcha);
+    box-shadow: 0 0 0 3px rgba(122,158,126,0.15);
+  }
+
+  .err {
+    display: none;
+    background: var(--straw-pale);
+    border: 1px solid var(--straw-lt);
+    color: var(--straw2);
+    padding: .6rem 1rem;
+    border-radius: .75rem;
+    font-size: .85rem;
+  }
+
+  .btn-primary {
+    padding: .85rem;
+    background: linear-gradient(135deg, var(--matcha) 0%, var(--matcha3) 100%);
+    color: white; border: none; border-radius: 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem; font-weight: 500;
+    cursor: pointer; letter-spacing: .02em;
+    transition: opacity .2s, transform .15s, box-shadow .2s;
+    box-shadow: 0 4px 15px rgba(61,102,66,0.3);
+  }
+  .btn-primary:hover { opacity: .92; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(61,102,66,0.35); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-straw {
+    background: linear-gradient(135deg, var(--straw) 0%, var(--straw2) 100%);
+    box-shadow: 0 4px 15px rgba(201,57,64,0.28);
+  }
+
+  /* ── App layout ── */
+  #screen-app {
+    display: none; flex-direction: column;
+    min-height: 100vh;
+    position: relative; z-index: 1;
+  }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.2rem 2rem;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header-brand {
+    display: flex; align-items: center; gap: .75rem;
+  }
+  .header-brand .logo-icon { font-size: 1.8rem; }
+  .header-brand h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem; font-weight: 600;
+    color: var(--matcha3);
+  }
+  .header-brand p {
+    font-family: 'Caveat', cursive;
+    font-size: .95rem; color: var(--straw);
+    margin-top: -.15rem;
+  }
+  .header-actions { display: flex; align-items: center; gap: .75rem; }
+  .btn-ghost {
+    padding: .5rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: .75rem;
+    background: white; color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem; cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-ghost:hover { border-color: var(--matcha); color: var(--matcha3); background: var(--sage-lt); }
+  .btn-save {
+    padding: .5rem 1.25rem;
+    border: none; border-radius: .75rem;
+    background: linear-gradient(135deg, var(--matcha), var(--matcha3));
+    color: white; font-family: 'DM Sans', sans-serif;
+    font-size: .85rem; font-weight: 500; cursor: pointer;
+    transition: all .2s;
+    box-shadow: 0 2px 10px rgba(61,102,66,0.25);
+  }
+  .btn-save:hover { opacity: .9; transform: translateY(-1px); }
+
+  main { flex: 1; padding: 2rem; max-width: 960px; margin: 0 auto; width: 100%; }
+
+  /* ── Hero section ── */
+  .hero {
+    background: linear-gradient(135deg, rgba(200,222,200,0.4) 0%, rgba(255,255,255,0.6) 100%);
+    border: 1.5px solid rgba(200,222,200,0.6);
+    border-radius: 2rem;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 1.5rem;
+    backdrop-filter: blur(8px);
+  }
+  .hero-left h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.7rem; font-weight: 600;
+    color: var(--matcha3);
+  }
+  .hero-left h2 span { color: var(--straw); font-style: italic; }
+  .hero-left .quote {
+    font-family: 'Caveat', cursive;
+    font-size: 1.15rem; color: var(--text2);
+    margin-top: .4rem;
+  }
+
+  .countdown-box {
+    background: white;
+    border: 2px solid var(--straw-lt);
+    border-radius: 1.5rem;
+    padding: 1rem 1.75rem;
+    text-align: center;
+    min-width: 160px;
+  }
+  .countdown-box .days {
+    font-family: 'Playfair Display', serif;
+    font-size: 3.5rem; font-weight: 600;
+    color: var(--straw);
+    line-height: 1;
+  }
+  .countdown-box .label {
+    font-size: .8rem; color: var(--text2); text-transform: uppercase;
+    letter-spacing: .08em; margin-top: .25rem;
+  }
+  .countdown-box .sublabel {
+    font-family: 'Caveat', cursive;
+    font-size: 1rem; color: var(--matcha);
+    margin-top: .2rem;
+  }
+
+  /* ── Overall progress ── */
+  .overall-card {
+    background: rgba(255,255,255,0.75);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+  }
+  .overall-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; color: var(--matcha3);
+    white-space: nowrap;
+  }
+  .overall-bar-wrap { flex: 1; min-width: 200px; }
+  .progress-track {
+    background: var(--sage-lt);
+    border-radius: 999px;
+    height: 14px; overflow: hidden;
+    border: 1px solid rgba(122,158,126,0.2);
+  }
+  .progress-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--matcha) 0%, var(--matcha3) 100%);
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+    position: relative;
+  }
+  .progress-fill::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+  @keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+
+  .overall-pct {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem; font-weight: 600;
+    color: var(--matcha3); white-space: nowrap;
+  }
+
+  /* ── Tabs ── */
+  .tabs-nav {
+    display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+  }
+  .tab-btn {
+    padding: .55rem 1.25rem;
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    background: white; color: var(--text2);
+    font-family: 'DM Sans', sans-serif; font-size: .9rem; font-weight: 500;
+    cursor: pointer; transition: all .2s;
+  }
+  .tab-btn.active {
+    background: linear-gradient(135deg, var(--matcha) 0%, var(--matcha3) 100%);
+    color: white; border-color: transparent;
+    box-shadow: 0 3px 12px rgba(61,102,66,0.25);
+  }
+  .tab-btn:not(.active):hover { border-color: var(--matcha); color: var(--matcha3); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeUp .3s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── Subject grid ── */
+  .subjects-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;
+  }
+
+  .subject-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .subject-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px var(--shadow); }
+
+  .subject-header {
+    display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem;
+  }
+  .subject-icon {
+    width: 42px; height: 42px;
+    background: var(--sage-lt);
+    border-radius: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    border: 1px solid rgba(122,158,126,0.2);
+  }
+  .subject-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; font-weight: 600; color: var(--matcha3);
+  }
+  .subject-pct-lbl {
+    margin-left: auto;
+    font-family: 'Caveat', cursive;
+    font-size: 1.4rem; color: var(--straw); font-weight: 700;
+  }
+
+  .subject-bar { margin-bottom: 1.25rem; }
+  .subject-bar .progress-fill {
+    background: linear-gradient(90deg, var(--straw-lt) 0%, var(--straw) 60%, var(--straw2) 100%);
+  }
+
+  .subject-inputs {
+    display: flex; gap: .75rem; align-items: center;
+  }
+  .subject-inputs label {
+    font-size: .75rem; color: var(--text2); text-transform: uppercase; letter-spacing: .05em;
+  }
+  .input-pair { display: flex; flex-direction: column; gap: .25rem; flex: 1; }
+  .input-pair input {
+    padding: .5rem .75rem;
+    border: 1.5px solid var(--border);
+    border-radius: .75rem;
+    font-family: 'DM Sans', sans-serif; font-size: .9rem; color: var(--text);
+    background: white; outline: none; width: 100%;
+    transition: border-color .2s;
+  }
+  .input-pair input:focus { border-color: var(--matcha); }
+  .divider-slash { color: var(--text2); font-size: 1.2rem; margin-top: 1rem; }
+
+  /* ── Edit panel ── */
+  .edit-panel {
+    display: none;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    animation: fadeUp .25s ease;
+  }
+  .edit-panel h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; color: var(--matcha3);
+    margin-bottom: 1rem;
+  }
+  .edit-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .edit-row .form-group { flex: 1; min-width: 200px; }
+  .edit-row input {
+    padding: .65rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 1rem; font-family: 'DM Sans', sans-serif;
+    font-size: .95rem; color: var(--text);
+    background: white; outline: none; width: 100%;
+    transition: border-color .2s;
+  }
+  .edit-row input:focus { border-color: var(--matcha); }
+
+  /* ── Score tracker tab ── */
+  .score-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem 2rem; margin-bottom: 1rem;
+  }
+  .score-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; color: var(--matcha3); margin-bottom: 1rem;
+  }
+  .score-subjects { display: flex; flex-direction: column; gap: .75rem; }
+  .score-row {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  }
+  .score-name {
+    min-width: 110px; font-weight: 500; font-size: .9rem; color: var(--text);
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .score-bar-wrap { flex: 1; min-width: 120px; }
+  .score-bar-wrap .progress-fill {
+    background: linear-gradient(90deg, var(--pink) 0%, var(--straw) 100%);
+  }
+  .score-pct { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--straw); min-width: 48px; text-align: right; }
+
+  /* ── TOS Tracker ── */
+  .tos-subject-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+  }
+  .tos-subject-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    cursor: pointer;
+    background: linear-gradient(135deg, rgba(200,222,200,0.2) 0%, rgba(255,255,255,0.4) 100%);
+    transition: background .2s;
+  }
+  .tos-subject-header:hover {
+    background: linear-gradient(135deg, rgba(200,222,200,0.3) 0%, rgba(255,255,255,0.5) 100%);
+  }
+  .tos-subject-info {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+  }
+  .tos-subject-icon {
+    font-size: 1.5rem;
+  }
+  .tos-subject-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--matcha3);
+  }
+  .tos-subject-progress {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+  }
+  .tos-progress-bar {
+    width: 120px;
+    height: 8px;
+    background: var(--sage-lt);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .tos-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--matcha) 0%, var(--matcha3) 100%);
+    border-radius: 999px;
+    transition: width .4s ease;
+  }
+  .tos-progress-text {
+    font-family: 'Caveat', cursive;
+    font-size: 1.2rem;
+    color: var(--straw);
+    font-weight: 700;
+    min-width: 40px;
+    text-align: right;
+  }
+  .tos-chevron {
+    font-size: .8rem;
+    color: var(--text2);
+    transition: transform .3s ease;
+  }
+  .tos-sections {
+    padding: 0 1.5rem 1.5rem;
+  }
+  .tos-section {
+    margin-top: 1rem;
+    background: rgba(255,255,255,0.6);
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    overflow: hidden;
+  }
+  .tos-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .85rem 1rem;
+    cursor: pointer;
+    background: rgba(200,222,200,0.15);
+    transition: background .2s;
+  }
+  .tos-section-header:hover {
+    background: rgba(200,222,200,0.25);
+  }
+  .tos-section-title {
+    font-size: .85rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .tos-section-progress {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .tos-section-text {
+    font-family: 'Caveat', cursive;
+    font-size: 1rem;
+    color: var(--matcha);
+    font-weight: 600;
+  }
+  .tos-chevron-small {
+    font-size: .7rem;
+    color: var(--text2);
+    transition: transform .3s ease;
+  }
+  .tos-topics {
+    padding: .75rem 1rem 1rem;
+    display: block;
+  }
+  .tos-topic {
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+    padding: .4rem 0;
+  }
+  .tos-topic input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin-top: 2px;
+    accent-color: var(--matcha);
+    cursor: pointer;
+  }
+  .tos-topic label {
+    font-size: .85rem;
+    color: var(--text);
+    line-height: 1.4;
+    cursor: pointer;
+    flex: 1;
+  }
+  .tos-topic input[type="checkbox"]:checked + label {
+    color: var(--matcha3);
+    text-decoration: line-through;
+    opacity: .7;
+  }
+
+  /* ── Drills Tracker ── */
+  .drills-subject-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  .drills-subject-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, rgba(232,82,90,0.1) 0%, rgba(255,255,255,0.4) 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .drills-subject-info {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+  }
+  .drills-subject-icon {
+    font-size: 1.5rem;
+  }
+  .drills-subject-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--matcha3);
+  }
+  .drills-subject-average {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .drills-average-label {
+    font-size: .85rem;
+    color: var(--text2);
+    font-weight: 500;
+  }
+  .drills-average-value {
+    font-family: 'Caveat', cursive;
+    font-size: 1.4rem;
+    color: var(--straw);
+    font-weight: 700;
+  }
+  .drills-table-container {
+    padding: 1.5rem;
+  }
+  .drills-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+  }
+  .drills-table th {
+    text-align: left;
+    padding: .75rem .5rem;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border-bottom: 2px solid var(--border);
+  }
+  .drills-table td {
+    padding: .5rem;
+    border-bottom: 1px solid rgba(232,216,208,0.5);
+  }
+  .drills-table tr:last-child td {
+    border-bottom: none;
+  }
+  .drills-input {
+    width: 100%;
+    padding: .5rem .6rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem;
+    color: var(--text);
+    background: white;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .drills-input:focus {
+    border-color: var(--matcha);
+  }
+  .drills-input[type="date"] {
+    min-width: 130px;
+  }
+  .drills-input[type="number"] {
+    min-width: 70px;
+  }
+  .drills-delete-btn {
+    padding: .4rem .6rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    background: white;
+    cursor: pointer;
+    font-size: .9rem;
+    transition: all .2s;
+  }
+  .drills-delete-btn:hover {
+    border-color: var(--straw);
+    background: var(--straw-pale);
+  }
+  .drills-add-btn {
+    width: 100%;
+    padding: .75rem;
+    border: 1.5px dashed var(--matcha);
+    border-radius: .75rem;
+    background: rgba(122,158,126,0.1);
+    color: var(--matcha3);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .drills-add-btn:hover {
+    background: rgba(122,158,126,0.2);
+    border-color: var(--matcha2);
+  }
+
+  /* ── Masterlist ── */
+  .masterlist-subject-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+  .masterlist-subject-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 1.5rem;
+    background: linear-gradient(135deg, rgba(245,160,164,0.15) 0%, rgba(255,255,255,0.4) 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .masterlist-subject-info {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+  }
+  .masterlist-subject-icon {
+    font-size: 1.5rem;
+  }
+  .masterlist-subject-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--matcha3);
+  }
+  .masterlist-add-btn {
+    padding: .5rem 1rem;
+    border: 1.5px solid var(--matcha);
+    border-radius: .75rem;
+    background: rgba(122,158,126,0.1);
+    color: var(--matcha3);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .masterlist-add-btn:hover {
+    background: rgba(122,158,126,0.2);
+    border-color: var(--matcha2);
+  }
+  .masterlist-table-container {
+    padding: 1.5rem;
+  }
+  .masterlist-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .masterlist-table th {
+    text-align: left;
+    padding: .75rem .5rem;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    border-bottom: 2px solid var(--border);
+  }
+  .masterlist-table td {
+    padding: .5rem;
+    border-bottom: 1px solid rgba(232,216,208,0.5);
+  }
+  .masterlist-table tr:last-child td {
+    border-bottom: none;
+  }
+  .masterlist-input {
+    width: 100%;
+    padding: .5rem .6rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem;
+    color: var(--text);
+    background: white;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .masterlist-input:focus {
+    border-color: var(--matcha);
+  }
+  .masterlist-select {
+    width: 100%;
+    padding: .5rem .6rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem;
+    color: var(--text);
+    background: white;
+    outline: none;
+    transition: border-color .2s;
+    cursor: pointer;
+  }
+  .masterlist-select:focus {
+    border-color: var(--matcha);
+  }
+  .masterlist-delete-btn {
+    padding: .4rem .6rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    background: white;
+    cursor: pointer;
+    font-size: .9rem;
+    transition: all .2s;
+  }
+  .masterlist-delete-btn:hover {
+    border-color: var(--straw);
+    background: var(--straw-pale);
+  }
+
+  /* ── Feature Cards (Common) ── */
+  .feature-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border-radius: 1.5rem;
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+  }
+  .feature-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.5rem;
+    color: var(--matcha3);
+    margin-bottom: 1.5rem;
+  }
+  .feature-input, .feature-select {
+    padding: .75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: .75rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    color: var(--text);
+    background: white;
+    outline: none;
+    transition: border-color .2s;
+  }
+  .feature-input:focus, .feature-select:focus {
+    border-color: var(--matcha);
+  }
+  .feature-btn {
+    padding: .75rem 1.5rem;
+    border: 1.5px solid var(--matcha);
+    border-radius: .75rem;
+    background: linear-gradient(135deg, var(--matcha) 0%, var(--matcha3) 100%);
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .feature-btn:hover {
+    box-shadow: 0 4px 12px rgba(61,102,66,0.25);
+    transform: translateY(-1px);
+  }
+  .feature-btn.secondary {
+    background: white;
+    color: var(--matcha3);
+  }
+  .feature-btn.secondary:hover {
+    background: var(--matcha);
+    color: white;
+  }
+
+  /* ── To-Do List ── */
+  .todo-input-row {
+    display: flex;
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .todo-input-row input {
+    flex: 1;
+    min-width: 200px;
+  }
+  .todo-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(255,255,255,0.6);
+    border-radius: .75rem;
+    margin-bottom: .75rem;
+    transition: all .2s;
+  }
+  .todo-item:hover {
+    background: rgba(255,255,255,0.8);
+  }
+  .todo-item.completed {
+    opacity: 0.6;
+  }
+  .todo-item.completed .todo-text {
+    text-decoration: line-through;
+  }
+  .todo-item input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+  }
+  .todo-text {
+    flex: 1;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem;
+    color: var(--text);
+  }
+  .todo-priority {
+    padding: .25rem .75rem;
+    border-radius: 999px;
+    font-size: .75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .todo-item[data-priority="high"] .todo-priority {
+    background: var(--straw-lt);
+    color: var(--straw2);
+  }
+  .todo-item[data-priority="medium"] .todo-priority {
+    background: var(--sage-lt);
+    color: var(--matcha2);
+  }
+  .todo-item[data-priority="low"] .todo-priority {
+    background: var(--cream);
+    color: var(--text2);
+  }
+  .todo-delete {
+    padding: .4rem .6rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    background: white;
+    cursor: pointer;
+    font-size: .9rem;
+    transition: all .2s;
+  }
+  .todo-delete:hover {
+    border-color: var(--straw);
+    background: var(--straw-pale);
+  }
+
+  /* ── Calendar ── */
+  .calendar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+  .calendar-header h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    color: var(--matcha3);
+  }
+  .calendar-nav {
+    padding: .5rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    background: white;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: all .2s;
+  }
+  .calendar-nav:hover {
+    border-color: var(--matcha);
+    background: var(--sage-lt);
+  }
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: .5rem;
+  }
+  .calendar-day-header {
+    text-align: center;
+    padding: .5rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+  }
+  .calendar-day {
+    aspect-ratio: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: .5rem;
+    background: rgba(255,255,255,0.6);
+    border-radius: .5rem;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .calendar-day:hover {
+    background: rgba(255,255,255,0.9);
+    transform: scale(1.05);
+  }
+  .calendar-day.empty {
+    background: transparent;
+    cursor: default;
+  }
+  .calendar-day.has-events {
+    background: rgba(122,158,126,0.2);
+    border: 1.5px solid var(--matcha);
+  }
+  .calendar-day-number {
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .calendar-event-dots {
+    font-size: .7rem;
+    color: var(--matcha3);
+    margin-top: .25rem;
+    letter-spacing: .1rem;
+  }
+  .event-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .event-modal-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 1.5rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+  }
+  .event-modal-content h4 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--matcha3);
+    margin-bottom: 1rem;
+  }
+  .event-actions {
+    display: flex;
+    gap: .75rem;
+    margin-top: 1rem;
+  }
+  .event-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .75rem;
+    background: var(--cream);
+    border-radius: .5rem;
+    margin-bottom: .5rem;
+  }
+  .event-item button {
+    padding: .25rem .5rem;
+    border: 1px solid var(--border);
+    border-radius: .25rem;
+    background: white;
+    cursor: pointer;
+    font-size: .8rem;
+  }
+  .event-item button:hover {
+    border-color: var(--straw);
+  }
+
+  /* ── Study Hours Heatmap ── */
+  .study-input-row {
+    display: flex;
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .heatmap-container {
+    margin-top: 1.5rem;
+  }
+  .heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(52, 1fr);
+    gap: .25rem;
+    margin-bottom: 1rem;
+  }
+  .heatmap-cell {
+    aspect-ratio: 1;
+    border-radius: .2rem;
+    cursor: pointer;
+    transition: transform .2s;
+  }
+  .heatmap-cell:hover {
+    transform: scale(1.2);
+  }
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .8rem;
+    color: var(--text2);
+  }
+  .legend-scale {
+    flex: 1;
+    height: 8px;
+    background: linear-gradient(to right, rgba(122,158,126,0.1), rgba(122,158,126,1));
+    border-radius: 999px;
+  }
+
+  /* ── Habits ── */
+  .habit-input-row {
+    display: flex;
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+  }
+  .habit-input-row input {
+    flex: 1;
+  }
+  .habit-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(255,255,255,0.6);
+    border-radius: .75rem;
+    margin-bottom: .75rem;
+    transition: all .2s;
+  }
+  .habit-item:hover {
+    background: rgba(255,255,255,0.8);
+  }
+  .habit-item input[type="checkbox"] {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+  }
+  .habit-name {
+    flex: 1;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem;
+    color: var(--text);
+  }
+  .habit-streak {
+    font-family: 'Caveat', cursive;
+    font-size: 1.1rem;
+    color: var(--straw);
+  }
+  .habit-delete {
+    padding: .4rem .6rem;
+    border: 1.5px solid var(--border);
+    border-radius: .5rem;
+    background: white;
+    cursor: pointer;
+    font-size: .9rem;
+    transition: all .2s;
+  }
+  .habit-delete:hover {
+    border-color: var(--straw);
+    background: var(--straw-pale);
+  }
+
+  /* ── Mood Tracker ── */
+  .mood-input-row {
+    display: flex;
+    gap: .75rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .quote-card {
+    background: linear-gradient(135deg, rgba(122,158,126,0.1) 0%, rgba(255,255,255,0.8) 100%);
+    padding: 1.5rem;
+    border-radius: 1rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+  }
+  .quote-card p {
+    font-family: 'Caveat', cursive;
+    font-size: 1.3rem;
+    color: var(--matcha3);
+    font-style: italic;
+  }
+  .mood-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .75rem 1rem;
+    background: rgba(255,255,255,0.6);
+    border-radius: .5rem;
+    margin-bottom: .5rem;
+  }
+  .mood-date {
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem;
+    color: var(--text2);
+  }
+  .mood-emoji {
+    font-size: 1.5rem;
+  }
+
+  /* ── Theme Toggle ── */
+  .theme-toggle-container {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    z-index: 100;
+  }
+  .theme-toggle-btn {
+    padding: .75rem 1.25rem;
+    border: 1.5px solid var(--matcha);
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--matcha) 0%, var(--matcha3) 100%);
+    color: white;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .2s;
+    box-shadow: 0 4px 12px rgba(61,102,66,0.25);
+  }
+  .theme-toggle-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(61,102,66,0.35);
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 2rem; right: 2rem;
+    background: var(--matcha3); color: white;
+    padding: .75rem 1.5rem; border-radius: 1rem;
+    font-family: 'DM Sans', sans-serif; font-size: .9rem;
+    opacity: 0; transform: translateY(10px);
+    transition: all .3s; pointer-events: none; z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    header { padding: 1rem; }
+    .header-brand h1 { font-size: 1.1rem; }
+    main { padding: 1rem; }
+    .hero { padding: 1.5rem; }
+    .hero-left h2 { font-size: 1.3rem; }
+    .overall-card { padding: 1rem 1.25rem; gap: 1rem; }
+    .auth-card { padding: 1.75rem 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Floating decoration -->
+<div class="deco deco-1">🍓</div>
+<div class="deco deco-2">🍵</div>
+<div class="deco deco-3">🌿</div>
+<div class="deco deco-4">🍓</div>
+<div class="deco deco-5">🍵</div>
+
+<!-- ══ AUTH SCREEN ══════════════════════════════════════════════════════════ -->
+<div id="screen-auth">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="icon-row">🍵🍓</div>
+      <h1>RPm Tracker</h1>
+      <p>your study companion ♡</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" data-authtab="login" onclick="window._rpm.showAuthTab('login')">Log In</button>
+      <button class="auth-tab-btn" data-authtab="signup" onclick="window._rpm.showAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- Login -->
+    <div id="auth-login" style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="form-group">
+        <label>Email</label>
+        <input id="login-email" type="email" placeholder="you@email.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="login-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')window._rpm.login()">
+      </div>
+      <div class="err" id="login-err"></div>
+      <button class="btn-primary" onclick="window._rpm.login()">Log In 🍵</button>
+    </div>
+
+    <!-- Sign Up -->
+    <div id="auth-signup" style="display:none;flex-direction:column;gap:1rem;">
+      <div class="form-group">
+        <label>Your Name</label>
+        <input id="signup-name" type="text" placeholder="Your name">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input id="signup-email" type="email" placeholder="you@email.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="signup-pass" type="password" placeholder="At least 6 characters">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input id="signup-pass2" type="password" placeholder="Repeat password" onkeydown="if(event.key==='Enter')window._rpm.signup()">
+      </div>
+      <div class="err" id="signup-err"></div>
+      <button class="btn-primary btn-straw" onclick="window._rpm.signup()">Create Account 🍓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP SCREEN ═══════════════════════════════════════════════════════════ -->
+<div id="screen-app">
+
+  <header>
+    <div class="header-brand">
+      <span class="logo-icon">🍵</span>
+      <div>
+        <h1>RPm Tracker</h1>
+        <p>BLEPP prep ♡</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-ghost" onclick="window._rpm.toggleEdit()">✏️ Edit</button>
+      <button class="btn-save" onclick="window._rpm.save()">Save ✓</button>
+      <button class="btn-ghost" onclick="window._rpm.logout()">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Edit panel -->
+    <div class="edit-panel" id="edit-panel">
+      <h3>✏️ Customize your tracker</h3>
+      <div class="edit-row">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input id="edit-name" type="text" placeholder="Your name" oninput="window._rpm.updateMeta()">
+        </div>
+        <div class="form-group">
+          <label>Motivational Quote</label>
+          <input id="edit-quote" type="text" placeholder="Your daily mantra…" oninput="window._rpm.updateMeta()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-left">
+        <h2>Hello, <span id="user-name">Scholar</span>! 🌿</h2>
+        <p class="quote" id="quote-text">You are so close. Keep going 🍓</p>
+      </div>
+      <div class="countdown-box">
+        <div class="days" id="days-count">–</div>
+        <div class="label">days until</div>
+        <div class="sublabel">BLEPP Aug 19, 2026</div>
+      </div>
+    </div>
+
+    <!-- Overall progress -->
+    <div class="overall-card">
+      <div class="overall-label">Overall Progress</div>
+      <div class="overall-bar-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="overall-bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="overall-pct" id="overall-pct">0%</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="tracker" onclick="window._rpm.switchTab('tracker')">📚 Tracker</button>
+      <button class="tab-btn" data-tab="tos" onclick="window._rpm.switchTab('tos')">📋 TOS</button>
+      <button class="tab-btn" data-tab="masterlist" onclick="window._rpm.switchTab('masterlist')">📑 Masterlist</button>
+      <button class="tab-btn" data-tab="drills" onclick="window._rpm.switchTab('drills')">📝 Drills</button>
+      <button class="tab-btn" data-tab="scores" onclick="window._rpm.switchTab('scores')">🪪 Score Summary</button>
+      <button class="tab-btn" data-tab="todos" onclick="window._rpm.switchTab('todos')">✅ To-Do</button>
+      <button class="tab-btn" data-tab="calendar" onclick="window._rpm.switchTab('calendar')">📅 Calendar</button>
+      <button class="tab-btn" data-tab="study" onclick="window._rpm.switchTab('study')">⏱️ Study Hours</button>
+      <button class="tab-btn" data-tab="habits" onclick="window._rpm.switchTab('habits')">🎯 Habits</button>
+      <button class="tab-btn" data-tab="mood" onclick="window._rpm.switchTab('mood')">💭 Mood</button>
+    </div>
+
+    <!-- Tracker Tab -->
+    <div class="tab-content active" id="tab-tracker">
+      <div class="subjects-grid">
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">🧠</div>
+            <div class="subject-name">ABPSYCH</div>
+            <div class="subject-pct-lbl" id="lbl-abpsych">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-abpsych" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-abpsych" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('abpsych')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-abpsych" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('abpsych')">
+            </div>
+          </div>
+        </div>
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">🌱</div>
+            <div class="subject-name">DEVPSY</div>
+            <div class="subject-pct-lbl" id="lbl-devpsy">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-devpsy" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-devpsy" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('devpsy')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-devpsy" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('devpsy')">
+            </div>
+          </div>
+        </div>
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">📋</div>
+            <div class="subject-name">PSYCAS</div>
+            <div class="subject-pct-lbl" id="lbl-psycas">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-psycas" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-psycas" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('psycas')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-psycas" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('psycas')">
+            </div>
+          </div>
+        </div>
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">💼</div>
+            <div class="subject-name">I/O PSYCH</div>
+            <div class="subject-pct-lbl" id="lbl-iopsych">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-iopsych" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-iopsych" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('iopsych')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-iopsych" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('iopsych')">
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /grid -->
+    </div><!-- /tracker tab -->
+
+    <!-- TOS Tab -->
+    <div class="tab-content" id="tab-tos">
+      <div id="tos-container"></div>
+    </div>
+
+    <!-- Masterlist Tab -->
+    <div class="tab-content" id="tab-masterlist">
+      <div id="masterlist-container"></div>
+    </div>
+
+    <!-- Drills Tab -->
+    <div class="tab-content" id="tab-drills">
+      <div id="drills-container"></div>
+    </div>
+
+    <!-- Score Summary Tab -->
+    <div class="tab-content" id="tab-scores">
+      <div class="score-card">
+        <h3>📊 Progress at a Glance</h3>
+        <div class="score-subjects">
+          <div class="score-row">
+            <div class="score-name">🧠 ABPSYCH</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-abpsych" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-abpsych">0%</div>
+          </div>
+          <div class="score-row">
+            <div class="score-name">🌱 DEVPSY</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-devpsy" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-devpsy">0%</div>
+          </div>
+          <div class="score-row">
+            <div class="score-name">📋 PSYCAS</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-psycas" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-psycas">0%</div>
+          </div>
+          <div class="score-row">
+            <div class="score-name">💼 I/O PSYCH</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-iopsych" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-iopsych">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="score-card" style="background:linear-gradient(135deg,rgba(200,222,200,0.3) 0%,rgba(255,255,255,0.8) 100%);">
+        <h3>🍓 Overall</h3>
+        <div class="score-row" style="gap:1.5rem">
+          <div style="font-family:'Playfair Display',serif;font-size:3rem;color:var(--straw);font-weight:600" id="big-pct">0%</div>
+          <div style="flex:1">
+            <div class="progress-track" style="height:18px">
+              <div class="progress-fill" id="big-bar" style="width:0%"></div>
+            </div>
+            <div style="margin-top:.5rem;font-family:'Caveat',cursive;color:var(--text2);font-size:1rem" id="big-label">Keep going — every topic counts! ✨</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /scores tab -->
+
+    <!-- To-Do Tab -->
+    <div class="tab-content" id="tab-todos">
+      <div class="feature-card">
+        <h3>✅ To-Do List</h3>
+        <div class="todo-input-row">
+          <input type="text" id="todo-input" placeholder="Add a new task..." class="feature-input">
+          <select id="todo-priority" class="feature-select">
+            <option value="low">Low Priority</option>
+            <option value="medium" selected>Medium Priority</option>
+            <option value="high">High Priority</option>
+          </select>
+          <button class="feature-btn" onclick="window._rpm.addTodo()">Add</button>
+        </div>
+        <div id="todos-container"></div>
+      </div>
+    </div>
+
+    <!-- Calendar Tab -->
+    <div class="tab-content" id="tab-calendar">
+      <div class="feature-card">
+        <h3>📅 Monthly Calendar</h3>
+        <div class="calendar-header">
+          <button class="calendar-nav" onclick="window._rpm.prevMonth()">◀</button>
+          <h4 id="calendar-month-year"></h4>
+          <button class="calendar-nav" onclick="window._rpm.nextMonth()">▶</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+        <div class="event-modal" id="event-modal" style="display:none">
+          <div class="event-modal-content">
+            <h4 id="event-date"></h4>
+            <input type="text" id="event-input" placeholder="Add event..." class="feature-input">
+            <div class="event-actions">
+              <button class="feature-btn" onclick="window._rpm.addEvent()">Add Event</button>
+              <button class="feature-btn secondary" onclick="window._rpm.closeEventModal()">Close</button>
+            </div>
+            <div id="events-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Study Hours Tab -->
+    <div class="tab-content" id="tab-study">
+      <div class="feature-card">
+        <h3>⏱️ Study Hours Tracker</h3>
+        <div class="study-input-row">
+          <input type="date" id="study-date" class="feature-input">
+          <input type="number" id="study-hours" placeholder="Hours" min="0" max="24" step="0.5" class="feature-input">
+          <button class="feature-btn" onclick="window._rpm.addStudyHours()">Log Hours</button>
+        </div>
+        <div class="heatmap-container">
+          <div class="heatmap-grid" id="heatmap-grid"></div>
+          <div class="heatmap-legend">
+            <span>Less</span>
+            <div class="legend-scale"></div>
+            <span>More</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Habits Tab -->
+    <div class="tab-content" id="tab-habits">
+      <div class="feature-card">
+        <h3>🎯 Habit Tracker</h3>
+        <div class="habit-input-row">
+          <input type="text" id="habit-input" placeholder="New habit name..." class="feature-input">
+          <button class="feature-btn" onclick="window._rpm.addHabit()">Add Habit</button>
+        </div>
+        <div id="habits-container"></div>
+      </div>
+    </div>
+
+    <!-- Mood Tab -->
+    <div class="tab-content" id="tab-mood">
+      <div class="feature-card">
+        <h3>💭 Mood Tracker</h3>
+        <div class="mood-input-row">
+          <input type="date" id="mood-date" class="feature-input">
+          <select id="mood-select" class="feature-select">
+            <option value="😊">😊 Happy</option>
+            <option value="😌">😌 Calm</option>
+            <option value="😐">😐 Neutral</option>
+            <option value="😔">😔 Sad</option>
+            <option value="😤">😤 Frustrated</option>
+            <option value="😰">😰 Anxious</option>
+            <option value="🥳">🥳 Excited</option>
+            <option value="😴">😴 Tired</option>
+          </select>
+          <button class="feature-btn" onclick="window._rpm.addMood()">Log Mood</button>
+        </div>
+        <div class="quote-card">
+          <p id="daily-quote">"You are so close. Keep going 🍓"</p>
+        </div>
+        <div id="mood-history"></div>
+      </div>
+    </div>
+
+    <!-- Theme Toggle -->
+    <div class="theme-toggle-container">
+      <button class="theme-toggle-btn" onclick="window._rpm.toggleTheme()">🎨 Switch Theme</button>
+    </div>
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // Sync score tab when tracker updates
+  const origRender = window._rpm;
+  // Patch renderApp to also update score tab
+  const _orig = window._rpm;
+
+  // Override tab switch to sync score bars
+  const _origSwitch = _orig.switchTab.bind(_orig);
+  _orig.switchTab = function(tab) {
+    _origSwitch(tab);
+    if (tab === 'scores') syncScoreTab();
+  };
+
+  function syncScoreTab() {
+    const subjects = ['abpsych','devpsy','psycas','iopsych'];
+    subjects.forEach(id => {
+      const lbl = document.getElementById(`lbl-${id}`);
+      const bar = document.getElementById(`bar-${id}`);
+      const b2  = document.getElementById(`bar2-${id}`);
+      const p2  = document.getElementById(`pct2-${id}`);
+      if (lbl && b2 && p2) {
+        b2.style.width = bar.style.width;
+        p2.textContent = lbl.textContent;
+      }
+    });
+    const overall = document.getElementById('overall-pct').textContent;
+    document.getElementById('big-pct').textContent = overall;
+    document.getElementById('big-bar').style.width  = overall;
+    const p = parseInt(overall);
+    let msg = 'Keep going — every topic counts! ✨';
+    if (p >= 75) msg = "Almost there! You\'re doing amazing 🍓";
+    else if (p >= 50) msg = "Halfway through — stay strong! 🍵";
+    else if (p >= 25) msg = "Great start! Keep the momentum 🌿";
+    document.getElementById('big-label').textContent = msg;
+  }
+
+  // Also call syncScoreTab on every renderApp
+  const origRenderApp = window.renderApp;
+  // We'll hook into MutationObserver on overall-pct to auto-sync
+  const observer = new MutationObserver(() => {
+    if (document.getElementById('tab-scores').classList.contains('active')) {
+      syncScoreTab();
+    }
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('overall-pct');
+    if (el) observer.observe(el, { childList: true, characterData: true, subtree: true });
+  });
+</script>
+
+<!-- ── Firebase setup instructions (shown in console) ── -->
+<script>
+  console.log('%c🍵 RPm Tracker — Firebase Setup', 'font-size:16px;color:#5C8260;font-weight:bold');
+  console.log('To connect Firebase:\n1. Go to https://console.firebase.google.com\n2. Create a project → Enable Email/Password auth\n3. Create a Firestore database\n4. Copy your config into the firebaseConfig object at the top of this file\n\nFirestore rules (for development):\nrules_version = "2";\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /trackers/{userId} {\n      allow read, write: if request.auth != null && request.auth.uid == userId;\n    }\n  }\n}');
+</script>
+
+</body>
+</html>
