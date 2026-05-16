@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RPm Tracker ♡</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey:            "AIzaSyDNO4CjyWo5HY5oKy-t8yuHcm9lIGyQVCk",
+    authDomain:        "rpmtracker-42e64.firebaseapp.com",
+    projectId:         "rpmtracker-42e64",
+    storageBucket:     "rpmtracker-42e64.firebasestorage.app",
+    messagingSenderId: "112649412989",
+    appId:             "1:112649412989:web:9e5503225a4f973e77ec14",
+    measurementId:     "G-K1EYJRYERM"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  // ── Subjects & default state ────────────────────────────────────────────
+  const SUBJECTS = [
+    { id: "abpsych",  label: "ABPSYCH",  total: 0, emoji: "🧠" },
+    { id: "devpsy",   label: "DEVPSY",   total: 0, emoji: "🌱" },
+    { id: "psycas",   label: "PSYCAS",   total: 0, emoji: "📋" },
+    { id: "iopsych",  label: "I/O PSYCH",total: 0, emoji: "💼" },
+  ];
+
+  const BLEPP_DATE = new Date("2026-08-19T08:00:00");
+
+  let currentUser = null;
+  let trackerData = {};
+  let unsubSnapshot = null;
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  function daysUntil() {
+    const now  = new Date();
+    const diff = BLEPP_DATE - now;
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }
+
+  function defaultData() {
+    const d = { name: "", quote: "" };
+    SUBJECTS.forEach(s => { d[s.id] = { done: 0, total: 100 }; });
+    return d;
+  }
+
+  function pct(done, total) {
+    if (!total) return 0;
+    return Math.min(100, Math.round((done / total) * 100));
+  }
+
+  function overallPct(data) {
+    let done = 0, total = 0;
+    SUBJECTS.forEach(s => { done += (data[s.id]?.done || 0); total += (data[s.id]?.total || 100); });
+    return pct(done, total);
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function renderApp(data) {
+    const days  = daysUntil();
+    const total = overallPct(data);
+
+    document.getElementById("days-count").textContent = days;
+    document.getElementById("overall-pct").textContent = total + "%";
+    document.getElementById("overall-bar-fill").style.width = total + "%";
+    document.getElementById("user-name").textContent = data.name || (currentUser?.displayName) || "Scholar";
+    document.getElementById("quote-text").textContent  = data.quote  || "You are so close. Keep going 🍓";
+
+    SUBJECTS.forEach(s => {
+      const d   = data[s.id] || { done: 0, total: 100 };
+      const p   = pct(d.done, d.total);
+      const bar = document.getElementById(`bar-${s.id}`);
+      const lbl = document.getElementById(`lbl-${s.id}`);
+      const inp = document.getElementById(`done-${s.id}`);
+      const tot = document.getElementById(`total-${s.id}`);
+      if (bar) bar.style.width = p + "%";
+      if (lbl) lbl.textContent = p + "%";
+      if (inp) inp.value = d.done;
+      if (tot) tot.value = d.total;
+    });
+  }
+
+  // ── Firestore sync ───────────────────────────────────────────────────────
+  function subscribeToData(uid) {
+    if (unsubSnapshot) unsubSnapshot();
+    const ref = doc(db, "trackers", uid);
+    unsubSnapshot = onSnapshot(ref, snap => {
+      if (snap.exists()) {
+        trackerData = snap.data();
+      } else {
+        trackerData = defaultData();
+        setDoc(ref, trackerData);
+      }
+      renderApp(trackerData);
+    });
+  }
+
+  async function saveData() {
+    if (!currentUser) return;
+    await setDoc(doc(db, "trackers", currentUser.uid), trackerData);
+    showToast("Saved ✓");
+  }
+
+  // ── Auth state ────────────────────────────────────────────────────────────
+  onAuthStateChanged(auth, user => {
+    currentUser = user;
+    if (user) {
+      showScreen("app");
+      subscribeToData(user.uid);
+    } else {
+      showScreen("auth");
+      if (unsubSnapshot) { unsubSnapshot(); unsubSnapshot = null; }
+    }
+  });
+
+  // ── Screen helpers ────────────────────────────────────────────────────────
+  function showScreen(name) {
+    ["auth", "app"].forEach(s => {
+      document.getElementById(`screen-${s}`).style.display = (s === name) ? "flex" : "none";
+    });
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 2500);
+  }
+
+  function showError(id, msg) {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = msg; el.style.display = "block"; }
+  }
+  function clearErrors() {
+    document.querySelectorAll(".err").forEach(e => { e.textContent = ""; e.style.display = "none"; });
+  }
+
+  // ── Expose to window ──────────────────────────────────────────────────────
+  window._rpm = {
+    async login() {
+      clearErrors();
+      const email = document.getElementById("login-email").value.trim();
+      const pass  = document.getElementById("login-pass").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, pass);
+      } catch (e) {
+        showError("login-err", friendlyError(e.code));
+      }
+    },
+    async signup() {
+      clearErrors();
+      const name  = document.getElementById("signup-name").value.trim();
+      const email = document.getElementById("signup-email").value.trim();
+      const pass  = document.getElementById("signup-pass").value;
+      const pass2 = document.getElementById("signup-pass2").value;
+      if (pass !== pass2) return showError("signup-err", "Passwords don't match 💔");
+      if (pass.length < 6) return showError("signup-err", "Password must be at least 6 characters.");
+      try {
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await updateProfile(cred.user, { displayName: name });
+        const init = { ...defaultData(), name };
+        await setDoc(doc(db, "trackers", cred.user.uid), init);
+      } catch (e) {
+        showError("signup-err", friendlyError(e.code));
+      }
+    },
+    logout() {
+      signOut(auth);
+    },
+    updateSubject(id) {
+      const done  = parseInt(document.getElementById(`done-${id}`).value)  || 0;
+      const total = parseInt(document.getElementById(`total-${id}`).value) || 100;
+      trackerData[id] = { done, total };
+      renderApp(trackerData);
+    },
+    updateMeta() {
+      trackerData.name  = document.getElementById("edit-name").value.trim()  || trackerData.name;
+      trackerData.quote = document.getElementById("edit-quote").value.trim() || trackerData.quote;
+      renderApp(trackerData);
+    },
+    save: saveData,
+    toggleEdit() {
+      const panel = document.getElementById("edit-panel");
+      const isHidden = panel.style.display === "none" || !panel.style.display;
+      panel.style.display = isHidden ? "block" : "none";
+      if (isHidden) {
+        document.getElementById("edit-name").value  = trackerData.name  || "";
+        document.getElementById("edit-quote").value = trackerData.quote || "";
+      }
+    },
+    switchTab(tab) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      document.querySelector(`.tab-btn[data-tab="${tab}"]`).classList.add("active");
+      document.getElementById(`tab-${tab}`).classList.add("active");
+    },
+    showAuthTab(tab) {
+      ["login","signup"].forEach(t => {
+        document.getElementById(`auth-${t}`).style.display = (t === tab) ? "flex" : "none";
+        document.querySelector(`[data-authtab="${t}"]`).classList.toggle("active", t === tab);
+      });
+    }
+  };
+
+  function friendlyError(code) {
+    const map = {
+      "auth/invalid-email": "Hmm, that email doesn't look right.",
+      "auth/user-not-found": "No account found with that email.",
+      "auth/wrong-password": "Wrong password. Try again 🍵",
+      "auth/email-already-in-use": "That email is already registered!",
+      "auth/weak-password": "Password is too weak (min 6 chars).",
+      "auth/invalid-credential": "Email or password is incorrect.",
+      "auth/network-request-failed": "Network error. Check your connection.",
+    };
+    return map[code] || "Something went wrong. Please try again.";
+  }
+</script>
+
+<style>
+  :root {
+    --cream:   #FDF8F3;
+    --matcha:  #7A9E7E;
+    --matcha2: #5C8260;
+    --matcha3: #3D6642;
+    --straw:   #E8525A;
+    --straw2:  #C93940;
+    --straw-lt:#FFD6D8;
+    --straw-pale:#FFF0F0;
+    --pink:    #F5A0A4;
+    --sage:    #C8DEC8;
+    --sage-lt: #EBF4EB;
+    --text:    #3A2E2E;
+    --text2:   #7A6060;
+    --border:  #E8D8D0;
+    --shadow:  rgba(122,158,126,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--cream);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Decorative background ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 700px 500px at 10% 20%, rgba(200,222,200,0.35) 0%, transparent 70%),
+      radial-gradient(ellipse 500px 400px at 90% 80%, rgba(232,82,90,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 300px 300px at 60% 10%, rgba(245,160,164,0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Floating deco ── */
+  .deco {
+    position: fixed; pointer-events: none; z-index: 0; opacity: 0.18;
+    font-size: 3rem; user-select: none;
+  }
+  .deco-1 { top: 5%;  left: 3%;  animation: float1 8s ease-in-out infinite; }
+  .deco-2 { top: 15%; right: 6%; font-size: 2rem; animation: float2 10s ease-in-out infinite; }
+  .deco-3 { bottom: 20%; left: 5%; font-size: 2.5rem; animation: float1 12s ease-in-out infinite; }
+  .deco-4 { bottom: 10%; right: 4%; animation: float2 9s ease-in-out infinite; }
+  .deco-5 { top: 50%; left: 50%; font-size: 8rem; opacity: 0.04; animation: spin 30s linear infinite; }
+
+  @keyframes float1 { 0%,100%{transform:translateY(0) rotate(-5deg)} 50%{transform:translateY(-20px) rotate(5deg)} }
+  @keyframes float2 { 0%,100%{transform:translateY(0) rotate(8deg)} 50%{transform:translateY(-15px) rotate(-3deg)} }
+  @keyframes spin    { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+  /* ── Screens ── */
+  #screen-auth, #screen-app { display: none; }
+  #screen-auth {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem 1rem;
+    position: relative; z-index: 1;
+  }
+
+  /* ── Auth card ── */
+  .auth-card {
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(12px);
+    border: 1.5px solid var(--border);
+    border-radius: 2rem;
+    padding: 2.5rem 2.5rem 2rem;
+    width: 100%; max-width: 420px;
+    box-shadow: 0 20px 60px var(--shadow), 0 4px 20px rgba(200,57,64,0.08);
+  }
+
+  .auth-logo {
+    text-align: center;
+    margin-bottom: 1.8rem;
+  }
+  .auth-logo h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    color: var(--matcha3);
+  }
+  .auth-logo p {
+    font-family: 'Caveat', cursive;
+    font-size: 1.1rem;
+    color: var(--straw);
+    margin-top: .2rem;
+  }
+  .auth-logo .icon-row {
+    font-size: 2.5rem;
+    margin-bottom: .5rem;
+    letter-spacing: .3rem;
+  }
+
+  .auth-tabs {
+    display: flex; gap: .5rem;
+    margin-bottom: 1.5rem;
+    background: var(--sage-lt);
+    border-radius: 1rem;
+    padding: .3rem;
+  }
+  .auth-tab-btn {
+    flex: 1; padding: .55rem;
+    border: none; background: transparent;
+    border-radius: .75rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .9rem; font-weight: 500;
+    color: var(--text2); cursor: pointer;
+    transition: all .25s;
+  }
+  .auth-tab-btn.active {
+    background: white;
+    color: var(--matcha3);
+    box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  }
+
+  .auth-form {
+    display: flex; flex-direction: column; gap: 1rem;
+  }
+  .form-group { display: flex; flex-direction: column; gap: .35rem; }
+  .form-group label {
+    font-size: .8rem; font-weight: 500;
+    color: var(--text2); letter-spacing: .05em; text-transform: uppercase;
+  }
+  .form-group input {
+    padding: .75rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: .95rem; color: var(--text);
+    background: white;
+    transition: border-color .2s, box-shadow .2s;
+    outline: none;
+  }
+  .form-group input:focus {
+    border-color: var(--matcha);
+    box-shadow: 0 0 0 3px rgba(122,158,126,0.15);
+  }
+
+  .err {
+    display: none;
+    background: var(--straw-pale);
+    border: 1px solid var(--straw-lt);
+    color: var(--straw2);
+    padding: .6rem 1rem;
+    border-radius: .75rem;
+    font-size: .85rem;
+  }
+
+  .btn-primary {
+    padding: .85rem;
+    background: linear-gradient(135deg, var(--matcha) 0%, var(--matcha3) 100%);
+    color: white; border: none; border-radius: 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem; font-weight: 500;
+    cursor: pointer; letter-spacing: .02em;
+    transition: opacity .2s, transform .15s, box-shadow .2s;
+    box-shadow: 0 4px 15px rgba(61,102,66,0.3);
+  }
+  .btn-primary:hover { opacity: .92; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(61,102,66,0.35); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-straw {
+    background: linear-gradient(135deg, var(--straw) 0%, var(--straw2) 100%);
+    box-shadow: 0 4px 15px rgba(201,57,64,0.28);
+  }
+
+  /* ── App layout ── */
+  #screen-app {
+    display: none; flex-direction: column;
+    min-height: 100vh;
+    position: relative; z-index: 1;
+  }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.2rem 2rem;
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header-brand {
+    display: flex; align-items: center; gap: .75rem;
+  }
+  .header-brand .logo-icon { font-size: 1.8rem; }
+  .header-brand h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.4rem; font-weight: 600;
+    color: var(--matcha3);
+  }
+  .header-brand p {
+    font-family: 'Caveat', cursive;
+    font-size: .95rem; color: var(--straw);
+    margin-top: -.15rem;
+  }
+  .header-actions { display: flex; align-items: center; gap: .75rem; }
+  .btn-ghost {
+    padding: .5rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: .75rem;
+    background: white; color: var(--text2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .85rem; cursor: pointer;
+    transition: all .2s;
+  }
+  .btn-ghost:hover { border-color: var(--matcha); color: var(--matcha3); background: var(--sage-lt); }
+  .btn-save {
+    padding: .5rem 1.25rem;
+    border: none; border-radius: .75rem;
+    background: linear-gradient(135deg, var(--matcha), var(--matcha3));
+    color: white; font-family: 'DM Sans', sans-serif;
+    font-size: .85rem; font-weight: 500; cursor: pointer;
+    transition: all .2s;
+    box-shadow: 0 2px 10px rgba(61,102,66,0.25);
+  }
+  .btn-save:hover { opacity: .9; transform: translateY(-1px); }
+
+  main { flex: 1; padding: 2rem; max-width: 960px; margin: 0 auto; width: 100%; }
+
+  /* ── Hero section ── */
+  .hero {
+    background: linear-gradient(135deg, rgba(200,222,200,0.4) 0%, rgba(255,255,255,0.6) 100%);
+    border: 1.5px solid rgba(200,222,200,0.6);
+    border-radius: 2rem;
+    padding: 2rem 2.5rem;
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 1.5rem;
+    backdrop-filter: blur(8px);
+  }
+  .hero-left h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.7rem; font-weight: 600;
+    color: var(--matcha3);
+  }
+  .hero-left h2 span { color: var(--straw); font-style: italic; }
+  .hero-left .quote {
+    font-family: 'Caveat', cursive;
+    font-size: 1.15rem; color: var(--text2);
+    margin-top: .4rem;
+  }
+
+  .countdown-box {
+    background: white;
+    border: 2px solid var(--straw-lt);
+    border-radius: 1.5rem;
+    padding: 1rem 1.75rem;
+    text-align: center;
+    min-width: 160px;
+  }
+  .countdown-box .days {
+    font-family: 'Playfair Display', serif;
+    font-size: 3.5rem; font-weight: 600;
+    color: var(--straw);
+    line-height: 1;
+  }
+  .countdown-box .label {
+    font-size: .8rem; color: var(--text2); text-transform: uppercase;
+    letter-spacing: .08em; margin-top: .25rem;
+  }
+  .countdown-box .sublabel {
+    font-family: 'Caveat', cursive;
+    font-size: 1rem; color: var(--matcha);
+    margin-top: .2rem;
+  }
+
+  /* ── Overall progress ── */
+  .overall-card {
+    background: rgba(255,255,255,0.75);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
+    display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;
+  }
+  .overall-label {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; color: var(--matcha3);
+    white-space: nowrap;
+  }
+  .overall-bar-wrap { flex: 1; min-width: 200px; }
+  .progress-track {
+    background: var(--sage-lt);
+    border-radius: 999px;
+    height: 14px; overflow: hidden;
+    border: 1px solid rgba(122,158,126,0.2);
+  }
+  .progress-fill {
+    height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--matcha) 0%, var(--matcha3) 100%);
+    transition: width .8s cubic-bezier(.4,0,.2,1);
+    position: relative;
+  }
+  .progress-fill::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+  @keyframes shimmer { 0%{background-position:200%} 100%{background-position:-200%} }
+
+  .overall-pct {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem; font-weight: 600;
+    color: var(--matcha3); white-space: nowrap;
+  }
+
+  /* ── Tabs ── */
+  .tabs-nav {
+    display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap;
+  }
+  .tab-btn {
+    padding: .55rem 1.25rem;
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    background: white; color: var(--text2);
+    font-family: 'DM Sans', sans-serif; font-size: .9rem; font-weight: 500;
+    cursor: pointer; transition: all .2s;
+  }
+  .tab-btn.active {
+    background: linear-gradient(135deg, var(--matcha) 0%, var(--matcha3) 100%);
+    color: white; border-color: transparent;
+    box-shadow: 0 3px 12px rgba(61,102,66,0.25);
+  }
+  .tab-btn:not(.active):hover { border-color: var(--matcha); color: var(--matcha3); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; animation: fadeUp .3s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── Subject grid ── */
+  .subjects-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem;
+  }
+
+  .subject-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    transition: transform .2s, box-shadow .2s;
+  }
+  .subject-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px var(--shadow); }
+
+  .subject-header {
+    display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem;
+  }
+  .subject-icon {
+    width: 42px; height: 42px;
+    background: var(--sage-lt);
+    border-radius: 1rem;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    border: 1px solid rgba(122,158,126,0.2);
+  }
+  .subject-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; font-weight: 600; color: var(--matcha3);
+  }
+  .subject-pct-lbl {
+    margin-left: auto;
+    font-family: 'Caveat', cursive;
+    font-size: 1.4rem; color: var(--straw); font-weight: 700;
+  }
+
+  .subject-bar { margin-bottom: 1.25rem; }
+  .subject-bar .progress-fill {
+    background: linear-gradient(90deg, var(--straw-lt) 0%, var(--straw) 60%, var(--straw2) 100%);
+  }
+
+  .subject-inputs {
+    display: flex; gap: .75rem; align-items: center;
+  }
+  .subject-inputs label {
+    font-size: .75rem; color: var(--text2); text-transform: uppercase; letter-spacing: .05em;
+  }
+  .input-pair { display: flex; flex-direction: column; gap: .25rem; flex: 1; }
+  .input-pair input {
+    padding: .5rem .75rem;
+    border: 1.5px solid var(--border);
+    border-radius: .75rem;
+    font-family: 'DM Sans', sans-serif; font-size: .9rem; color: var(--text);
+    background: white; outline: none; width: 100%;
+    transition: border-color .2s;
+  }
+  .input-pair input:focus { border-color: var(--matcha); }
+  .divider-slash { color: var(--text2); font-size: 1.2rem; margin-top: 1rem; }
+
+  /* ── Edit panel ── */
+  .edit-panel {
+    display: none;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    animation: fadeUp .25s ease;
+  }
+  .edit-panel h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; color: var(--matcha3);
+    margin-bottom: 1rem;
+  }
+  .edit-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .edit-row .form-group { flex: 1; min-width: 200px; }
+  .edit-row input {
+    padding: .65rem 1rem;
+    border: 1.5px solid var(--border);
+    border-radius: 1rem; font-family: 'DM Sans', sans-serif;
+    font-size: .95rem; color: var(--text);
+    background: white; outline: none; width: 100%;
+    transition: border-color .2s;
+  }
+  .edit-row input:focus { border-color: var(--matcha); }
+
+  /* ── Score tracker tab ── */
+  .score-card {
+    background: rgba(255,255,255,0.8);
+    backdrop-filter: blur(8px);
+    border: 1.5px solid var(--border);
+    border-radius: 1.5rem;
+    padding: 1.5rem 2rem; margin-bottom: 1rem;
+  }
+  .score-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem; color: var(--matcha3); margin-bottom: 1rem;
+  }
+  .score-subjects { display: flex; flex-direction: column; gap: .75rem; }
+  .score-row {
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  }
+  .score-name {
+    min-width: 110px; font-weight: 500; font-size: .9rem; color: var(--text);
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .score-bar-wrap { flex: 1; min-width: 120px; }
+  .score-bar-wrap .progress-fill {
+    background: linear-gradient(90deg, var(--pink) 0%, var(--straw) 100%);
+  }
+  .score-pct { font-family: 'Caveat', cursive; font-size: 1.2rem; color: var(--straw); min-width: 48px; text-align: right; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 2rem; right: 2rem;
+    background: var(--matcha3); color: white;
+    padding: .75rem 1.5rem; border-radius: 1rem;
+    font-family: 'DM Sans', sans-serif; font-size: .9rem;
+    opacity: 0; transform: translateY(10px);
+    transition: all .3s; pointer-events: none; z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    header { padding: 1rem; }
+    .header-brand h1 { font-size: 1.1rem; }
+    main { padding: 1rem; }
+    .hero { padding: 1.5rem; }
+    .hero-left h2 { font-size: 1.3rem; }
+    .overall-card { padding: 1rem 1.25rem; gap: 1rem; }
+    .auth-card { padding: 1.75rem 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Floating decoration -->
+<div class="deco deco-1">🍓</div>
+<div class="deco deco-2">🍵</div>
+<div class="deco deco-3">🌿</div>
+<div class="deco deco-4">🍓</div>
+<div class="deco deco-5">🍵</div>
+
+<!-- ══ AUTH SCREEN ══════════════════════════════════════════════════════════ -->
+<div id="screen-auth">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="icon-row">🍵🍓</div>
+      <h1>RPm Tracker</h1>
+      <p>your study companion ♡</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab-btn active" data-authtab="login" onclick="window._rpm.showAuthTab('login')">Log In</button>
+      <button class="auth-tab-btn" data-authtab="signup" onclick="window._rpm.showAuthTab('signup')">Sign Up</button>
+    </div>
+
+    <!-- Login -->
+    <div id="auth-login" style="display:flex;flex-direction:column;gap:1rem;">
+      <div class="form-group">
+        <label>Email</label>
+        <input id="login-email" type="email" placeholder="you@email.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="login-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')window._rpm.login()">
+      </div>
+      <div class="err" id="login-err"></div>
+      <button class="btn-primary" onclick="window._rpm.login()">Log In 🍵</button>
+    </div>
+
+    <!-- Sign Up -->
+    <div id="auth-signup" style="display:none;flex-direction:column;gap:1rem;">
+      <div class="form-group">
+        <label>Your Name</label>
+        <input id="signup-name" type="text" placeholder="e.g. Niszel Marie">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input id="signup-email" type="email" placeholder="you@email.com">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input id="signup-pass" type="password" placeholder="At least 6 characters">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input id="signup-pass2" type="password" placeholder="Repeat password" onkeydown="if(event.key==='Enter')window._rpm.signup()">
+      </div>
+      <div class="err" id="signup-err"></div>
+      <button class="btn-primary btn-straw" onclick="window._rpm.signup()">Create Account 🍓</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ APP SCREEN ═══════════════════════════════════════════════════════════ -->
+<div id="screen-app">
+
+  <header>
+    <div class="header-brand">
+      <span class="logo-icon">🍵</span>
+      <div>
+        <h1>RPm Tracker</h1>
+        <p>BLEPP prep ♡</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-ghost" onclick="window._rpm.toggleEdit()">✏️ Edit</button>
+      <button class="btn-save" onclick="window._rpm.save()">Save ✓</button>
+      <button class="btn-ghost" onclick="window._rpm.logout()">Log out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Edit panel -->
+    <div class="edit-panel" id="edit-panel">
+      <h3>✏️ Customize your tracker</h3>
+      <div class="edit-row">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input id="edit-name" type="text" placeholder="Your name" oninput="window._rpm.updateMeta()">
+        </div>
+        <div class="form-group">
+          <label>Motivational Quote</label>
+          <input id="edit-quote" type="text" placeholder="Your daily mantra…" oninput="window._rpm.updateMeta()">
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-left">
+        <h2>Hello, <span id="user-name">Scholar</span>! 🌿</h2>
+        <p class="quote" id="quote-text">You are so close. Keep going 🍓</p>
+      </div>
+      <div class="countdown-box">
+        <div class="days" id="days-count">–</div>
+        <div class="label">days until</div>
+        <div class="sublabel">BLEPP Aug 19, 2026</div>
+      </div>
+    </div>
+
+    <!-- Overall progress -->
+    <div class="overall-card">
+      <div class="overall-label">Overall Progress</div>
+      <div class="overall-bar-wrap">
+        <div class="progress-track">
+          <div class="progress-fill" id="overall-bar-fill" style="width:0%"></div>
+        </div>
+      </div>
+      <div class="overall-pct" id="overall-pct">0%</div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="tracker" onclick="window._rpm.switchTab('tracker')">📚 Tracker</button>
+      <button class="tab-btn" data-tab="scores" onclick="window._rpm.switchTab('scores')">🪪 Score Summary</button>
+    </div>
+
+    <!-- Tracker Tab -->
+    <div class="tab-content active" id="tab-tracker">
+      <div class="subjects-grid">
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">🧠</div>
+            <div class="subject-name">ABPSYCH</div>
+            <div class="subject-pct-lbl" id="lbl-abpsych">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-abpsych" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-abpsych" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('abpsych')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-abpsych" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('abpsych')">
+            </div>
+          </div>
+        </div>
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">🌱</div>
+            <div class="subject-name">DEVPSY</div>
+            <div class="subject-pct-lbl" id="lbl-devpsy">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-devpsy" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-devpsy" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('devpsy')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-devpsy" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('devpsy')">
+            </div>
+          </div>
+        </div>
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">📋</div>
+            <div class="subject-name">PSYCAS</div>
+            <div class="subject-pct-lbl" id="lbl-psycas">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-psycas" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-psycas" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('psycas')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-psycas" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('psycas')">
+            </div>
+          </div>
+        </div>
+
+        <div class="subject-card">
+          <div class="subject-header">
+            <div class="subject-icon">💼</div>
+            <div class="subject-name">I/O PSYCH</div>
+            <div class="subject-pct-lbl" id="lbl-iopsych">0%</div>
+          </div>
+          <div class="subject-bar">
+            <div class="progress-track">
+              <div class="progress-fill" id="bar-iopsych" style="width:0%"></div>
+            </div>
+          </div>
+          <div class="subject-inputs">
+            <div class="input-pair">
+              <label>Done</label>
+              <input id="done-iopsych" type="number" min="0" placeholder="0" oninput="window._rpm.updateSubject('iopsych')">
+            </div>
+            <div class="divider-slash">/</div>
+            <div class="input-pair">
+              <label>Total</label>
+              <input id="total-iopsych" type="number" min="1" placeholder="100" oninput="window._rpm.updateSubject('iopsych')">
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /grid -->
+    </div><!-- /tracker tab -->
+
+    <!-- Score Summary Tab -->
+    <div class="tab-content" id="tab-scores">
+      <div class="score-card">
+        <h3>📊 Progress at a Glance</h3>
+        <div class="score-subjects">
+          <div class="score-row">
+            <div class="score-name">🧠 ABPSYCH</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-abpsych" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-abpsych">0%</div>
+          </div>
+          <div class="score-row">
+            <div class="score-name">🌱 DEVPSY</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-devpsy" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-devpsy">0%</div>
+          </div>
+          <div class="score-row">
+            <div class="score-name">📋 PSYCAS</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-psycas" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-psycas">0%</div>
+          </div>
+          <div class="score-row">
+            <div class="score-name">💼 I/O PSYCH</div>
+            <div class="score-bar-wrap"><div class="progress-track" style="height:10px"><div class="progress-fill" id="bar2-iopsych" style="width:0%"></div></div></div>
+            <div class="score-pct" id="pct2-iopsych">0%</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="score-card" style="background:linear-gradient(135deg,rgba(200,222,200,0.3) 0%,rgba(255,255,255,0.8) 100%);">
+        <h3>🍓 Overall</h3>
+        <div class="score-row" style="gap:1.5rem">
+          <div style="font-family:'Playfair Display',serif;font-size:3rem;color:var(--straw);font-weight:600" id="big-pct">0%</div>
+          <div style="flex:1">
+            <div class="progress-track" style="height:18px">
+              <div class="progress-fill" id="big-bar" style="width:0%"></div>
+            </div>
+            <div style="margin-top:.5rem;font-family:'Caveat',cursive;color:var(--text2);font-size:1rem" id="big-label">Keep going — every topic counts! ✨</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /scores tab -->
+
+  </main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  // Sync score tab when tracker updates
+  const origRender = window._rpm;
+  // Patch renderApp to also update score tab
+  const _orig = window._rpm;
+
+  // Override tab switch to sync score bars
+  const _origSwitch = _orig.switchTab.bind(_orig);
+  _orig.switchTab = function(tab) {
+    _origSwitch(tab);
+    if (tab === 'scores') syncScoreTab();
+  };
+
+  function syncScoreTab() {
+    const subjects = ['abpsych','devpsy','psycas','iopsych'];
+    subjects.forEach(id => {
+      const lbl = document.getElementById(`lbl-${id}`);
+      const bar = document.getElementById(`bar-${id}`);
+      const b2  = document.getElementById(`bar2-${id}`);
+      const p2  = document.getElementById(`pct2-${id}`);
+      if (lbl && b2 && p2) {
+        b2.style.width = bar.style.width;
+        p2.textContent = lbl.textContent;
+      }
+    });
+    const overall = document.getElementById('overall-pct').textContent;
+    document.getElementById('big-pct').textContent = overall;
+    document.getElementById('big-bar').style.width  = overall;
+    const p = parseInt(overall);
+    let msg = 'Keep going — every topic counts! ✨';
+    if (p >= 75) msg = "Almost there! You\'re doing amazing 🍓";
+    else if (p >= 50) msg = "Halfway through — stay strong! 🍵";
+    else if (p >= 25) msg = "Great start! Keep the momentum 🌿";
+    document.getElementById('big-label').textContent = msg;
+  }
+
+  // Also call syncScoreTab on every renderApp
+  const origRenderApp = window.renderApp;
+  // We'll hook into MutationObserver on overall-pct to auto-sync
+  const observer = new MutationObserver(() => {
+    if (document.getElementById('tab-scores').classList.contains('active')) {
+      syncScoreTab();
+    }
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    const el = document.getElementById('overall-pct');
+    if (el) observer.observe(el, { childList: true, characterData: true, subtree: true });
+  });
+</script>
+
+<!-- ── Firebase setup instructions (shown in console) ── -->
+<script>
+  console.log('%c🍵 RPm Tracker — Firebase Setup', 'font-size:16px;color:#5C8260;font-weight:bold');
+  console.log('To connect Firebase:\n1. Go to https://console.firebase.google.com\n2. Create a project → Enable Email/Password auth\n3. Create a Firestore database\n4. Copy your config into the firebaseConfig object at the top of this file\n\nFirestore rules (for development):\nrules_version = "2";\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /trackers/{userId} {\n      allow read, write: if request.auth != null && request.auth.uid == userId;\n    }\n  }\n}');
+</script>
+
+</body>
+</html>
