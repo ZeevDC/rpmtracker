@@ -1096,8 +1096,6 @@
                 <tr>
                   <th>Title</th>
                   <th>Link</th>
-                  <th>Status</th>
-                  <th>Score</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1106,14 +1104,7 @@
                   <tr>
                     <td><input type="text" class="masterlist-input" value="${item.title || ''}" placeholder="Drill title" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'title', this.value)"></td>
                     <td>${item.link ? `<a href="${item.link}" target="_blank" class="masterlist-link">${item.link}</a>` : '<span style="color:#bbb;font-size:.8rem">No link</span>'}</td>
-                    <td>
-                      <select class="masterlist-select" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'status', this.value)">
-                        <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
-                        <option value="in-progress" ${item.status === 'in-progress' ? 'selected' : ''}>In Progress</option>
-                        <option value="completed" ${item.status === 'completed' ? 'selected' : ''}>Completed</option>
-                      </select>
-                    </td>
-                    <td><input type="text" class="masterlist-input" value="${item.score || ''}" placeholder="e.g., 85%" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'score', this.value)"></td>
+
                     <td><button class="masterlist-delete-btn" onclick="window._rpm.deleteMasterlistItem('${subject.id}', ${idx})">🗑️</button></td>
                   </tr>
                 `).join('')}
