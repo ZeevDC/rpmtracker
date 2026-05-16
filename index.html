@@ -1105,7 +1105,7 @@
                 ${items.map((item, idx) => `
                   <tr>
                     <td><input type="text" class="masterlist-input" value="${item.title || ''}" placeholder="Drill title" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'title', this.value)"></td>
-                    <td><div class="masterlist-link-cell">${item.link ? `<a href="${item.link}" target="_blank" class="masterlist-link">🔗 Open</a>` : ''}<input type="url" class="masterlist-input" value="${item.link || ''}" placeholder="https://..." onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'link', this.value)"></div></td>
+                    <td>${item.link ? `<a href="${item.link}" target="_blank" class="masterlist-link">${item.link}</a>` : '<span style="color:#bbb;font-size:.8rem">No link</span>'}</td>
                     <td>
                       <select class="masterlist-select" onchange="window._rpm.updateMasterlistItem('${subject.id}', ${idx}, 'status', this.value)">
                         <option value="pending" ${item.status === 'pending' ? 'selected' : ''}>Pending</option>
@@ -2289,27 +2289,14 @@
   .masterlist-table tr:last-child td {
     border-bottom: none;
   }
-  .masterlist-link-cell {
-    display: flex;
-    flex-direction: column;
-    gap: .3rem;
-  }
   .masterlist-link {
-    display: inline-block;
-    font-size: .8rem;
-    font-weight: 500;
     color: var(--matcha);
-    text-decoration: none;
-    padding: .2rem .5rem;
-    border-radius: .4rem;
-    border: 1.5px solid var(--matcha);
-    transition: background .2s, color .2s;
-    white-space: nowrap;
-    width: fit-content;
+    font-size: .82rem;
+    word-break: break-all;
+    text-decoration: underline;
   }
   .masterlist-link:hover {
-    background: var(--matcha);
-    color: white;
+    opacity: .75;
   }
   .masterlist-input {
     width: 100%;
